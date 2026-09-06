@@ -1077,7 +1077,7 @@ function setupPlayerListeners() {
 
   player.addEventListener('play', () => {
     updatePlayPauseButtonUI(true);
-    setupAudioBooster();
+    updateVolumeUI();
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
@@ -3028,10 +3028,24 @@ function updatePlayPauseButtonUI(isPlaying) {
   if (pauseIcon) pauseIcon.style.display = isPlaying ? 'block' : 'none';
 }
 
+function unmutePlayerAudio() {
+  const player = document.getElementById('videoPlayer');
+  if (!player) return;
+  player.muted = false;
+  player.volume = 1.0;
+  updateVolumeUI();
+  const overlay = document.getElementById('unmutePromptOverlay');
+  if (overlay) overlay.style.display = 'none';
+  showToast('Sound Unmuted (100% Volume)');
+}
+
 function toggleMute() {
   const player = document.getElementById('videoPlayer');
   if (!player) return;
   player.muted = !player.muted;
+  if (!player.muted && player.volume === 0) {
+    player.volume = 1.0;
+  }
   updateVolumeUI();
   showToast(player.muted ? 'Muted' : 'Unmuted');
 }
@@ -3058,6 +3072,11 @@ function updateVolumeUI() {
     const isMuted = player.muted || player.volume === 0;
     if (highIcon) highIcon.style.display = isMuted ? 'none' : 'block';
     if (muteIcon) muteIcon.style.display = isMuted ? 'block' : 'none';
+  }
+
+  const overlay = document.getElementById('unmutePromptOverlay');
+  if (overlay) {
+    overlay.style.display = (player.muted && !player.paused) ? 'block' : 'none';
   }
 }
 

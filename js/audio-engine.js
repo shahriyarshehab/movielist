@@ -87,11 +87,13 @@ function selectStereoChannelMode(mode) {
     window.playerSettings.stereoChannelMode = mode;
   }
   if (typeof savePlayerSettings === 'function') savePlayerSettings();
-  setupAudioBooster();
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+  if (mode === 'left-channel' || mode === 'right-channel') {
+    setupAudioBooster();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    applyAudioChannelRouting();
   }
-  applyAudioChannelRouting();
   if (typeof updateCustomizerUIState === 'function') updateCustomizerUIState();
   if (typeof updateYouTubeMenuState === 'function') updateYouTubeMenuState();
   const label =
@@ -142,11 +144,13 @@ function selectAudioTrackMode(mode, title, nativeTrackIdx = -1, hlsTrackIdx = -1
     }
     player.muted = false;
     settings.stereoChannelMode = mode;
-    setupAudioBooster();
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+    if (mode === 'left-channel' || mode === 'right-channel') {
+      setupAudioBooster();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      applyAudioChannelRouting();
     }
-    applyAudioChannelRouting();
   }
 
   if (typeof savePlayerSettings === 'function') savePlayerSettings();
@@ -522,10 +526,14 @@ function handleAudioBoostGain(gainVal) {
   settings.audioBoostGain = gain;
   if (typeof savePlayerSettings === 'function') savePlayerSettings();
 
-  setupAudioBooster();
-  if (audioGainNode && audioCtx) {
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    audioGainNode.gain.setValueAtTime(gain / 100, audioCtx.currentTime);
+  if (gain > 100) {
+    setupAudioBooster();
+    if (audioGainNode && audioCtx) {
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      audioGainNode.gain.setValueAtTime(gain / 100, audioCtx.currentTime);
+    }
+  } else if (audioGainNode && audioCtx) {
+    audioGainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
   }
 
   const slider = document.getElementById('sliderAudioBoost');
