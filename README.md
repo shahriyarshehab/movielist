@@ -4,7 +4,7 @@ Ultra-Speed Cinema & HD Media Streaming Platform
 
 CineBox is an open-source, high-performance web streaming application built for ultra-fast local and broadband (BDIX) networks. It catalogs and streams movies, television series, and animations with adaptive HLS streaming, Web Audio channel splitting for dual-audio releases, and an integrated media player.
 
-Live Site: [https://cinebox.dpdns.org](https://cinebox.dpdns.org) | Backup Mirror: [https://shahriyarshehab.github.io/cinebox/](https://shahriyarshehab.github.io/cinebox/)
+Live Site: [https://shahriyarshehab.github.io/cinebox/](https://shahriyarshehab.github.io/cinebox/)
 
 ---
 
