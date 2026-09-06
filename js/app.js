@@ -141,6 +141,17 @@ async function init() {
   updateWatchlistNavBadge();
   const page = detectPageType();
 
+  // Instant 0ms Paint for Watchlist Page: Do not block on home_data.json network fetch
+  if (page === 'watchlist') {
+    activeNavTab = 'watchlist';
+    currentView = 'watchlist';
+    renderView();
+    setupGlobalShortcuts();
+    setupSearchFocusEvents();
+    scheduleIdleCatalogLoad();
+    return;
+  }
+
   // Daily First Load Detection - Clear stale session cache on a new day to pull fresh mother server updates
   const todayStr = new Date().toISOString().split('T')[0];
   const lastClientDate = localStorage.getItem('cinebox_client_last_date');
@@ -846,7 +857,7 @@ function filterWatchlistTab(tab) {
   renderWatchlistView();
 }
 
-function renderWatchlistView() {
+function renderWatchlistView(searchQuery = '') {
   const container = document.getElementById('mainContent');
   if (!container) return;
 
@@ -864,6 +875,15 @@ function renderWatchlistView() {
   else if (currentWatchlistFilter === 'tv') displayList = tvOnly;
   else if (currentWatchlistFilter === 'history') displayList = historyList;
   else if (currentWatchlistFilter === 'updates') displayList = markedUpdatesList;
+
+  const q = (searchQuery || '').trim().toLowerCase();
+  if (q) {
+    displayList = displayList.filter((m) => {
+      const title = (m.title || '').toLowerCase();
+      const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : '').toLowerCase();
+      return title.includes(q) || cleanTitle.includes(q);
+    });
+  }
 
   container.innerHTML = `
         <div class="filter-bar-wrap">
@@ -925,7 +945,7 @@ function renderWatchlistView() {
           displayList.length > 0
             ? `
             <div class="poster-grid" id="movieGrid">
-                ${displayList.map((item) => renderMovieCardHtml(item)).join('')}
+                ${displayList.map((item) => renderWatchlistCardHtml(item, currentWatchlistFilter)).join('')}
             </div>
         `
             : `
@@ -933,9 +953,9 @@ function renderWatchlistView() {
                 <div style="margin-bottom: 16px;">
                     <i data-lucide="bookmark" style="color: var(--text-dim); width: 48px; height: 48px;"></i>
                 </div>
-                <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">No Titles Found in This Tab</h2>
+                <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">${q ? 'No Matching Titles' : 'No Titles Found in This Tab'}</h2>
                 <p style="font-size: 13px; color: var(--text-muted); max-width: 380px; margin: 0 auto 16px;">
-                    Bookmark movies and series with the save icon to access them here anytime!
+                    ${q ? 'No saved titles match your search. Try another keyword or clear search.' : 'Bookmark movies and series with the save icon to access them here anytime!'}
                 </p>
                 <a class="btn btn-primary" style="text-decoration: none;" href="index.html">Explore Cinema Catalog</a>
             </div>
@@ -943,6 +963,73 @@ function renderWatchlistView() {
         }
     `;
   refreshLucideIcons();
+}
+
+function renderWatchlistCardHtml(rawItem, tab) {
+  const item = typeof cleanItem === 'function' ? cleanItem(rawItem) : (rawItem || {});
+  const rawTitle = item.title || '';
+  const displayTitle = typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(rawTitle) : rawTitle;
+  const safeTitle = typeof escapeQuotes === 'function' ? escapeQuotes(displayTitle) : displayTitle;
+  const escapedDisplayTitle = typeof escapeHtml === 'function' ? escapeHtml(displayTitle) : displayTitle;
+  const safePoster = typeof sanitizeUrl === 'function' ? sanitizeUrl(item.poster) : item.poster;
+  const itemData = encodeURIComponent(JSON.stringify(item));
+  const isSeries =
+    typeof isMediaSeries === 'function'
+      ? isMediaSeries(item)
+      : item.tag === 'TV Series' || item.tag === 'K-Drama' || (item.url && item.url.endsWith('/'));
+  const linkUrl = `watch.html?title=${encodeURIComponent(rawTitle)}&data=${itemData}`;
+  let markerHtml = getMediaReleaseMarker(item.date);
+  const isMarked = typeof isMarkedForUpdate === 'function' && isMarkedForUpdate(rawTitle);
+  if (isMarked) {
+    markerHtml = '<div class="media-marker marker-tracking">TRACKING</div>' + markerHtml;
+  }
+  const isRecent = markerHtml.length > 0;
+
+  const playIconSvg = getLucideSvg(isSeries ? 'tv' : 'play', {
+    width: 16,
+    height: 16,
+    fill: isSeries ? 'none' : 'currentColor',
+    stroke: 'currentColor'
+  });
+  const fallbackIconSvg = getLucideSvg('film', { width: 24, height: 24 });
+
+  let removeAction = `removeFromWatchlist('${escapeQuotes(rawTitle)}', event)`;
+  if (tab === 'history') {
+    removeAction = `removeWatchHistory('${escapeQuotes(item.url)}', event)`;
+  } else if (tab === 'updates') {
+    removeAction = `toggleMarkedUpdate(${escapeQuotesJson(item)}); if (typeof renderWatchlistView === 'function') renderWatchlistView();`;
+  }
+
+  return `
+        <a class="movie-card" href="${linkUrl}">
+            <div class="card-cover">
+                <img src="${safePoster}" alt="${safeTitle}" loading="lazy" decoding="async"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="cover-fallback" style="display: none;">
+                    ${fallbackIconSvg}
+                    <div style="font-size: 10px; font-weight: 600;">${safeTitle}</div>
+                </div>
+                ${markerHtml}
+                <button class="btn-remove-history" onclick="${removeAction}" title="Remove title" aria-label="Remove title">
+                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                </button>
+                <div class="tag-badge">${typeof escapeHtml === 'function' ? escapeHtml(item.tag || (isSeries ? 'Series' : 'HD')) : (item.tag || 'HD')}</div>
+                <div class="cover-overlay">
+                    <div class="play-button-symbol" style="${isSeries ? 'background: linear-gradient(135deg, #00e5ff 0%, #0077b6 100%);' : ''}">
+                        ${playIconSvg}
+                    </div>
+                    <span style="font-size: 10px; font-weight: 700; color: #fff;">${isSeries ? 'Series' : 'Watch'}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="card-title" title="${safeTitle}">${escapedDisplayTitle}</div>
+                <div class="card-meta">
+                    <span>${typeof escapeHtml === 'function' ? escapeHtml(item.size || 'HD') : (item.size || 'HD')}</span>
+                    <span style="${isRecent ? 'color: var(--primary); font-weight: 700;' : ''}">${typeof escapeHtml === 'function' ? escapeHtml(item.date || '') : (item.date || '')}</span>
+                </div>
+            </div>
+        </a>
+    `;
 }
 
 function exportWatchlist() {
@@ -980,7 +1067,8 @@ function handleWatchlistImport(event) {
         const existing = getWatchlist();
         const titles = new Set(existing.map((m) => (m.title || '').toLowerCase()));
         let added = 0;
-        for (const item of imported) {
+        for (const raw of imported) {
+          const item = cleanItem(raw);
           if (item && item.title && !titles.has(item.title.toLowerCase())) {
             existing.push(item);
             titles.add(item.title.toLowerCase());
@@ -1360,6 +1448,13 @@ function setupSearchFocusEvents() {
 function handleLiveSearch(val) {
   clearTimeout(liveSearchTimer);
   const query = (val || '').trim();
+  const page = detectPageType();
+
+  if (page === 'watchlist') {
+    renderWatchlistView(query);
+    return;
+  }
+
   const dropdown = document.getElementById('searchDropdown');
   if (!dropdown) return;
 
@@ -1499,6 +1594,13 @@ document.addEventListener('click', (e) => {
 async function handleSearch() {
   hideSearchDropdown();
   const q = document.getElementById('searchInput').value.trim();
+  const page = detectPageType();
+
+  if (page === 'watchlist') {
+    renderWatchlistView(q);
+    return;
+  }
+
   if (!q) {
     showHomeView();
     return;
@@ -1616,7 +1718,7 @@ function renderMovieCardHtml(rawItem) {
   let markerHtml = getMediaReleaseMarker(item.date);
   const isMarked = typeof isMarkedForUpdate === 'function' && isMarkedForUpdate(rawTitle);
   if (isMarked) {
-    markerHtml = '<div class="media-marker marker-tracking">🔔 TRACKING</div>' + markerHtml;
+    markerHtml = '<div class="media-marker marker-tracking">TRACKING</div>' + markerHtml;
   }
   const isRecent = markerHtml.length > 0;
 

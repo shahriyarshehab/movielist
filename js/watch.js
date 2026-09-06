@@ -30,14 +30,7 @@ const DEFAULT_PLAYER_SETTINGS = {
   ambientMode: 'sync', // sync, accent, off
   ambientIntensity: 75,
   aspectRatio: 'contain', // contain, cover, 16/9, 4/3, 21/9
-  audioTrackMode: 'stereo', // stereo, left-channel, right-channel, native-0, native-1, external
-  audioTrackTitle: 'Default (Stereo Full)',
-  externalAudioUrl: '',
-  externalAudioTitle: '',
-  externalAudioOffset: 0.0,
   videoQuality: '1080p', // auto, 1080p, 720p, 480p, 360p
-  audioBoostGain: 100, // 100 to 300%
-  audioProfile: 'standard', // standard, dialogue, bass, night
   subSize: 18,
   subColor: '#ffffff',
   subColorName: 'White',
@@ -2027,11 +2020,7 @@ function applyAllPlayerSettings() {
   // 4. Apply Subtitle Styles
   updateSubtitleStyleSheet();
 
-  // 5. Apply Audio Settings & Channel Routing
-  applyAudioSettings();
-  applyAudioChannelRouting();
-
-  // 6. Update UI Controls & Badges
+  // 5. Update UI Controls & Badges
   updateCustomizerUIState();
 
   // 7. Update YouTube Settings Menu UI
@@ -2118,39 +2107,6 @@ function updateCustomizerUIState() {
   if (chipSync) chipSync.classList.toggle('active', playerSettings.ambientMode === 'sync');
   if (chipAccent) chipAccent.classList.toggle('active', playerSettings.ambientMode === 'accent');
   if (chipOff) chipOff.classList.toggle('active', playerSettings.ambientMode === 'off');
-
-  // Audio Boost
-  const boostTxt = document.getElementById('valAudioBoostText');
-  if (boostTxt)
-    boostTxt.textContent = `${playerSettings.audioBoostGain}% ${playerSettings.audioBoostGain > 100 ? '(Boosted)' : '(Normal)'}`;
-  const boostGainVal = document.getElementById('valAudioGainSlider');
-  if (boostGainVal) boostGainVal.textContent = `${playerSettings.audioBoostGain}%`;
-  const sAudio = document.getElementById('sliderAudioBoost');
-  if (sAudio) sAudio.value = playerSettings.audioBoostGain;
-
-  const cpBoostBadge = document.getElementById('cpBoostBadge');
-  if (cpBoostBadge) {
-    if (playerSettings.audioBoostGain > 100) {
-      cpBoostBadge.style.display = 'inline-flex';
-      cpBoostBadge.textContent = `Boost ${playerSettings.audioBoostGain}%`;
-    } else {
-      cpBoostBadge.style.display = 'none';
-    }
-  }
-
-  [100, 150, 200, 300].forEach((g) => {
-    const c = document.getElementById(`chipGain${g}`);
-    if (c) c.classList.toggle('active', playerSettings.audioBoostGain === g);
-  });
-
-  // Audio Profile cards
-  document.querySelectorAll('.preset-card[data-profile]').forEach((card) => {
-    card.classList.toggle('active', card.getAttribute('data-profile') === playerSettings.audioProfile);
-  });
-  const audProfText = document.getElementById('valAudioProfileText');
-  if (audProfText)
-    audProfText.textContent =
-      playerSettings.audioProfile.charAt(0).toUpperCase() + playerSettings.audioProfile.slice(1);
 
   // Subtitle UI
   const subSizeText = document.getElementById('valSubSizeText');
@@ -3023,7 +2979,7 @@ function setupMobileTouchGestures() {
         initialTouchVal = playerSettings.brightness;
       } else if (xRel > 0.6 && playerSettings.gestureVolume) {
         gestureType = 'volume';
-        initialTouchVal = playerSettings.audioBoostGain;
+        initialTouchVal = player.volume;
       } else {
         gestureType = 'seek';
         initialTouchVal = player.currentTime;
@@ -3046,10 +3002,11 @@ function setupMobileTouchGestures() {
         applyVideoFilterCss();
         showGestureHud('brightness', `${playerSettings.brightness}%`, (playerSettings.brightness - 50) / 110);
       } else if (gestureType === 'volume' && Math.abs(deltaY) > 10) {
-        const newGain = Math.max(0, Math.min(300, initialTouchVal + (deltaY / 150) * 100));
-        playerSettings.audioBoostGain = Math.round(newGain);
-        applyAudioSettings();
-        showGestureHud('volume', `${playerSettings.audioBoostGain}%`, playerSettings.audioBoostGain / 300);
+        const newVol = Math.max(0, Math.min(1, initialTouchVal + (deltaY / 150)));
+        player.volume = newVol;
+        player.muted = (newVol === 0);
+        updateVolumeUI();
+        showGestureHud('volume', `${Math.round(newVol * 100)}%`, newVol);
       } else if (gestureType === 'seek' && Math.abs(deltaX) > 15 && player.duration) {
         const timeDelta = (deltaX / 300) * 60; // 300px = 60s
         const targetTime = Math.max(0, Math.min(player.duration, initialTouchVal + timeDelta));
@@ -3188,9 +3145,6 @@ function setupSearchKeybindings() {
       playPrevEpisode();
     } else if (e.key === 'c' || e.key === 'C') {
       toggleSubtitles();
-    } else if (e.key === 'b' || e.key === 'B') {
-      e.preventDefault();
-      openAudioTrackDirectMenu(e);
     } else if (e.key === 'Escape') {
       const ytPopup = document.getElementById('ytSettingsPopup');
       const customModal = document.getElementById('playerCustomModal');

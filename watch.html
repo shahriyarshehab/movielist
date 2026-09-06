@@ -1396,7 +1396,7 @@
                 Player Customization Studio
               </div>
               <div style="font-size: 11.5px; color: var(--text-muted)">
-                Configure video filters, audio boost, subtitles, gesture controls & theme
+                Configure video filters, subtitles, gesture controls & theme
               </div>
             </div>
           </div>
@@ -1428,10 +1428,6 @@
           <button class="custom-tab-btn active" id="tabBtnVisuals" onclick="switchCustomTab('tabVisuals')">
             <i data-lucide="sun"></i>
             <span>Visuals & Filters</span>
-          </button>
-          <button class="custom-tab-btn" id="tabBtnAudio" onclick="switchCustomTab('tabAudio')">
-            <i data-lucide="volume-2"></i>
-            <span>Audio Booster</span>
           </button>
           <button class="custom-tab-btn" id="tabBtnSubtitles" onclick="switchCustomTab('tabSubtitles')">
             <i data-lucide="captions"></i>
@@ -1644,85 +1640,7 @@
           </div>
 
           <!-- ============================================== -->
-          <!-- TAB 2: AUDIO & BOOSTER                         -->
-          <!-- ============================================== -->
-          <div class="custom-tab-panel" id="tabAudio">
-            <!-- Volume Booster -->
-            <div class="custom-section-block">
-              <div class="custom-block-label">
-                <span>Master Audio Volume Booster (Web Audio Gain)</span>
-                <span class="custom-badge custom-badge-boost" id="valAudioBoostText">100% (Normal)</span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px">
-                Boost volume up to 300% for quiet movie rips and whispered audio tracks.
-              </div>
-              <div class="custom-slider-row">
-                <div class="slider-header">
-                  <span class="slider-title">Amplification Gain</span>
-                  <span class="slider-val" id="valAudioGainSlider">100%</span>
-                </div>
-                <input
-                  type="range"
-                  class="custom-range"
-                  id="sliderAudioBoost"
-                  min="100"
-                  max="300"
-                  step="10"
-                  value="100"
-                  oninput="handleAudioBoostGain(this.value)"
-                />
-              </div>
-              <div class="custom-choice-row" style="margin-top: 10px">
-                <button class="choice-chip active" id="chipGain100" onclick="handleAudioBoostGain(100)">
-                  100% Normal
-                </button>
-                <button class="choice-chip" id="chipGain150" onclick="handleAudioBoostGain(150)">150% Boost</button>
-                <button class="choice-chip" id="chipGain200" onclick="handleAudioBoostGain(200)">200% Super</button>
-                <button class="choice-chip" id="chipGain300" onclick="handleAudioBoostGain(300)">300% Max</button>
-              </div>
-            </div>
-
-            <!-- Audio Profiles -->
-            <div class="custom-section-block">
-              <div class="custom-block-label">
-                <span>Audio Equalizer & Dialogue Enhancer</span>
-                <span class="custom-badge" id="valAudioProfileText">Standard</span>
-              </div>
-              <div class="custom-presets-grid">
-                <button class="preset-card active" data-profile="standard" onclick="setAudioProfile('standard')">
-                  <div class="preset-icon">
-                    <i data-lucide="headphones"></i>
-                  </div>
-                  <div class="preset-name">Standard Reference</div>
-                  <div class="preset-desc">Original untouched acoustics</div>
-                </button>
-                <button class="preset-card" data-profile="dialogue" onclick="setAudioProfile('dialogue')">
-                  <div class="preset-icon">
-                    <i data-lucide="mic"></i>
-                  </div>
-                  <div class="preset-name">Dialogue Clarifier</div>
-                  <div class="preset-desc">Boost vocal 2.5kHz frequencies</div>
-                </button>
-                <button class="preset-card" data-profile="bass" onclick="setAudioProfile('bass')">
-                  <div class="preset-icon">
-                    <i data-lucide="activity"></i>
-                  </div>
-                  <div class="preset-name">Movie Bass Rumble</div>
-                  <div class="preset-desc">Enhanced low-end cinematic punch</div>
-                </button>
-                <button class="preset-card" data-profile="night" onclick="setAudioProfile('night')">
-                  <div class="preset-icon">
-                    <i data-lucide="moon"></i>
-                  </div>
-                  <div class="preset-name">Night Mode Compression</div>
-                  <div class="preset-desc">Evens out explosions & quiet speech</div>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- ============================================== -->
-          <!-- TAB 3: SUBTITLES (CC)                          -->
+          <!-- TAB 2: SUBTITLES (CC)                          -->
           <!-- ============================================== -->
           <div class="custom-tab-panel" id="tabSubtitles">
             <!-- Subtitle File & Live Status -->
@@ -2180,7 +2098,7 @@
                 <div>
                   <div style="font-size: 13.5px; font-weight: 700; color: #ff5252">Reset Player Customizations</div>
                   <div style="font-size: 11px; color: var(--text-muted)">
-                    Revert all visual filters, audio boost, subtitle styles & gestures to defaults.
+                    Revert all visual filters, subtitle styles & gestures to defaults.
                   </div>
                 </div>
                 <button
@@ -2194,7 +2112,7 @@
                     border-radius: 8px;
                   "
                 >
-                  ↺ Reset All
+                  Reset All
                 </button>
               </div>
             </div>

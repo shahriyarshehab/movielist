@@ -40,7 +40,9 @@ function showToast(msg) {
 // ==========================================
 function getWatchlist() {
   try {
-    return JSON.parse(localStorage.getItem('cinebox_watchlist') || '[]');
+    const raw = JSON.parse(localStorage.getItem('cinebox_watchlist') || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(Boolean).map(cleanItem);
   } catch (e) {
     return [];
   }
@@ -49,8 +51,13 @@ function getWatchlist() {
 function isInWatchlist(title) {
   if (!title) return false;
   const list = getWatchlist();
-  const clean = title.toLowerCase().trim();
-  return list.some((m) => (m.title || '').toLowerCase().trim() === clean);
+  const rawClean = title.toLowerCase().trim();
+  const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(title) : title).toLowerCase().trim();
+  return list.some((m) => {
+    const mRaw = (m.title || '').toLowerCase().trim();
+    const mClean = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : m.title).toLowerCase().trim();
+    return mRaw === rawClean || mClean === cleanTitle || mRaw === cleanTitle || mClean === rawClean;
+  });
 }
 
 function triggerConfettiBurst() {
@@ -68,17 +75,23 @@ function triggerConfettiBurst() {
 
 function toggleWatchlist(movieObj) {
   if (!movieObj || !movieObj.title) return false;
+  const cleaned = cleanItem(movieObj);
   const list = getWatchlist();
-  const cleanTitle = (movieObj.title || '').toLowerCase().trim();
-  const idx = list.findIndex((m) => (m.title || '').toLowerCase().trim() === cleanTitle);
+  const rawClean = (cleaned.title || '').toLowerCase().trim();
+  const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(cleaned.title) : cleaned.title).toLowerCase().trim();
+  const idx = list.findIndex((m) => {
+    const mRaw = (m.title || '').toLowerCase().trim();
+    const mClean = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : m.title).toLowerCase().trim();
+    return mRaw === rawClean || mClean === cleanTitle || mRaw === cleanTitle || mClean === rawClean;
+  });
 
   let isAdded = false;
   if (idx >= 0) {
     list.splice(idx, 1);
     showToast('Removed from Watchlist');
   } else {
-    list.unshift(movieObj);
-    showToast('💖 Added to Watchlist');
+    list.unshift(cleaned);
+    showToast('Added to Watchlist');
     triggerConfettiBurst();
     isAdded = true;
   }
@@ -86,6 +99,31 @@ function toggleWatchlist(movieObj) {
   localStorage.setItem('cinebox_watchlist', JSON.stringify(list));
   updateWatchlistNavBadge();
   return isAdded;
+}
+
+function removeFromWatchlist(title, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  if (!title) return;
+  const list = getWatchlist();
+  const rawClean = title.toLowerCase().trim();
+  const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(title) : title).toLowerCase().trim();
+  const idx = list.findIndex((m) => {
+    const mRaw = (m.title || '').toLowerCase().trim();
+    const mClean = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : m.title).toLowerCase().trim();
+    return mRaw === rawClean || mClean === cleanTitle || mRaw === cleanTitle || mClean === rawClean;
+  });
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    localStorage.setItem('cinebox_watchlist', JSON.stringify(list));
+    updateWatchlistNavBadge();
+    showToast('Removed from Watchlist');
+    if (typeof renderWatchlistView === 'function') {
+      renderWatchlistView();
+    }
+  }
 }
 
 function updateWatchlistNavBadge() {
@@ -121,11 +159,13 @@ function cleanItem(item) {
 }
 
 // ==========================================
-// 🔔 Future Updates & Release Tracker System
+//  Future Updates & Release Tracker System
 // ==========================================
 function getMarkedUpdates() {
   try {
-    return JSON.parse(localStorage.getItem('cinebox_marked_updates') || '[]');
+    const raw = JSON.parse(localStorage.getItem('cinebox_marked_updates') || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(Boolean).map(cleanItem);
   } catch (e) {
     return [];
   }
@@ -134,23 +174,34 @@ function getMarkedUpdates() {
 function isMarkedForUpdate(title) {
   if (!title) return false;
   const list = getMarkedUpdates();
-  const clean = title.toLowerCase().trim();
-  return list.some((m) => (m.title || '').toLowerCase().trim() === clean);
+  const rawClean = title.toLowerCase().trim();
+  const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(title) : title).toLowerCase().trim();
+  return list.some((m) => {
+    const mRaw = (m.title || '').toLowerCase().trim();
+    const mClean = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : m.title).toLowerCase().trim();
+    return mRaw === rawClean || mClean === cleanTitle || mRaw === cleanTitle || mClean === rawClean;
+  });
 }
 
 function toggleMarkedUpdate(movieObj) {
   if (!movieObj || !movieObj.title) return false;
+  const cleaned = cleanItem(movieObj);
   const list = getMarkedUpdates();
-  const cleanTitle = (movieObj.title || '').toLowerCase().trim();
-  const idx = list.findIndex((m) => (m.title || '').toLowerCase().trim() === cleanTitle);
+  const rawClean = (cleaned.title || '').toLowerCase().trim();
+  const cleanTitle = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(cleaned.title) : cleaned.title).toLowerCase().trim();
+  const idx = list.findIndex((m) => {
+    const mRaw = (m.title || '').toLowerCase().trim();
+    const mClean = (typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(m.title) : m.title).toLowerCase().trim();
+    return mRaw === rawClean || mClean === cleanTitle || mRaw === cleanTitle || mClean === rawClean;
+  });
 
   let isMarked = false;
   if (idx >= 0) {
     list.splice(idx, 1);
-    showToast('🔔 Removed from Update Tracker');
+    showToast('Removed from Update Tracker');
   } else {
-    list.unshift(movieObj);
-    showToast('🔔 Marked for Future Updates! Tracking new releases.');
+    list.unshift(cleaned);
+    showToast('Marked for Future Updates! Tracking new releases.');
     triggerConfettiBurst();
     isMarked = true;
   }

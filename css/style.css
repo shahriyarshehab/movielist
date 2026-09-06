@@ -926,12 +926,18 @@ header {
   z-index: 5;
 }
 
-.continue-card:hover .btn-remove-history {
+.continue-card:hover .btn-remove-history,
+.movie-card:hover .btn-remove-history {
   opacity: 1;
+}
+
+.card-cover .btn-remove-history {
+  opacity: 0.85;
 }
 
 .btn-remove-history:hover {
   background: var(--accent);
+  opacity: 1;
 }
 
 /* Category Filter Bar */
