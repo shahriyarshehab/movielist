@@ -18,6 +18,7 @@ Thumbs.db
 # Scratch and logs
 *.log
 scratch/
+.last_daily_sync
 build-output/
 *.apk
 *.aab

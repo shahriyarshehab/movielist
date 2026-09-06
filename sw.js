@@ -1,24 +1,14 @@
-const CACHE_NAME = 'cinebox-v29';
+const CACHE_NAME = 'movielist-v1';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './tv.html',
-  './movies.html',
-  './animation.html',
-  './watchlist.html',
-  './watch.html',
-  './css/style.css',
+  './css/movielist.css',
   './js/lucide.min.js',
-  './js/core.js',
-  './js/app.js',
-  './js/watch.js',
+  './js/movielist.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './home_data.json',
-  './data/latest.json',
-  './data/today.json',
-  './metadata_cache.json',
   './manifest.json'
 ];
 
