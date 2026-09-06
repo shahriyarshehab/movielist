@@ -1477,3 +1477,370 @@ body {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   Continue Watching Shelf & Progress Trackers
+   ========================================================================== */
+.continue-watching-section {
+  max-width: 1400px;
+  width: calc(100% - 32px);
+  margin: 32px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cw-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cw-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cw-slider {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 2px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 255, 0.4) transparent;
+}
+
+.cw-card {
+  flex: 0 0 280px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), var(--glass-highlight);
+  transition: transform var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) ease, box-shadow var(--duration-fast) var(--ease-spring);
+  display: flex;
+  flex-direction: column;
+}
+
+.cw-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  border-color: var(--primary);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px var(--primary-glow);
+}
+
+.cw-thumbnail-wrap {
+  position: relative;
+  width: 100%;
+  height: 155px;
+  overflow: hidden;
+  background: #000;
+}
+
+.cw-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s var(--ease-spring);
+}
+
+.cw-card:hover .cw-thumbnail-img {
+  transform: scale(1.08);
+}
+
+.cw-play-btn {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.9);
+  color: #050811;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--primary-glow);
+  transform: scale(0.9);
+  transition: transform var(--duration-fast) var(--ease-bounce);
+}
+
+.cw-card:hover .cw-play-btn {
+  transform: scale(1.1);
+  background: var(--primary);
+}
+
+.cw-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(5, 8, 17, 0.75);
+  border: 1px solid var(--glass-border);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: all var(--duration-fast) var(--ease-spring);
+}
+
+.cw-remove-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.15);
+}
+
+.cw-progress-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.cw-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00b4d8 0%, #00e5ff 100%);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.cw-info {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cw-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Dynamic Ambilight Video Aura & Controls
+   ========================================================================== */
+.player-cinema-box {
+  position: relative;
+}
+
+.player-ambilight-canvas {
+  position: absolute;
+  top: -30px;
+  left: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  border-radius: 36px;
+  filter: blur(60px) saturate(220%);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.5s ease;
+}
+
+.player-cinema-box.ambilight-off .player-ambilight-canvas {
+  opacity: 0;
+}
+
+.player-controls-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-pill-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all var(--duration-fast) var(--ease-spring);
+}
+
+.player-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+
+.player-pill-btn.active {
+  background: rgba(0, 229, 255, 0.25);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.player-speed-select {
+  padding: 5px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+
+.player-speed-select option {
+  background: #050811;
+  color: #fff;
+}
+
+/* ==========================================================================
+   External Player Launchers (VLC, MX Player, PotPlayer)
+   ========================================================================== */
+.external-players-card {
+  margin-top: 18px;
+  padding: 14px 18px;
+  background: var(--glass-bg-subtle);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.external-players-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.external-players-grid {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-ext-player {
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--duration-fast) var(--ease-spring);
+  text-decoration: none;
+  background: var(--glass-bg);
+  color: #fff;
+}
+
+.btn-ext-vlc {
+  border-color: rgba(255, 140, 0, 0.45);
+}
+.btn-ext-vlc:hover {
+  background: linear-gradient(135deg, #ff8c00 0%, #ff5500 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(255, 140, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-ext-mx {
+  border-color: rgba(0, 150, 255, 0.45);
+}
+.btn-ext-mx:hover {
+  background: linear-gradient(135deg, #0096ff 0%, #0055ff 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0, 150, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-ext-pot {
+  border-color: rgba(255, 215, 0, 0.45);
+}
+.btn-ext-pot:hover {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  color: #050811;
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-ext-copy {
+  border-color: rgba(0, 229, 255, 0.35);
+  color: var(--primary);
+}
+.btn-ext-copy:hover {
+  background: var(--primary);
+  color: #050811;
+  box-shadow: 0 4px 16px var(--primary-glow);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Trailer Theater Modal
+   ========================================================================== */
+.trailer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 4, 8, 0.95);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 650;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-spring);
+}
+
+.trailer-modal-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+.trailer-cinema-box {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 40px var(--accent-glow);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  animation: modalSpringIn 0.35s var(--ease-spring);
+}
+
+.trailer-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+

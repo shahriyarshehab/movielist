@@ -1,6 +1,6 @@
 /**
  * MovieList - Core Application Engine
- * Architecture: Ultra-Fast Glassmorphism SPA
+ * Architecture: Ultra-Fast Glassmorphism SPA with Cinema Suite
  */
 
 (function () {
@@ -18,7 +18,10 @@
     currentSlideIdx: 0,
     slideInterval: null,
     watchlist: new Set(),
+    history: [],
     activeMovie: null,
+    ambilightEnabled: true,
+    ambilightLoopId: null,
     theme: localStorage.getItem('movielist_theme') || 'dark'
   };
 
@@ -62,7 +65,7 @@
     else if (/1080p/i.test(text)) quality = '1080p HD';
     else if (/720p/i.test(text)) quality = '720p';
 
-    // Remove leading order numbers (e.g. "001. ")
+    // Remove leading order numbers
     text = text.replace(/^\d{1,4}[\.\s\-–—]+\s*/, '');
 
     // Remove file extensions
@@ -138,6 +141,106 @@
     }
   }
 
+  // Continue Watching & History Engine
+  function loadHistory() {
+    try {
+      state.history = JSON.parse(localStorage.getItem('movielist_history') || '[]');
+    } catch (e) {
+      state.history = [];
+    }
+    renderContinueWatching();
+  }
+
+  function saveWatchProgress(movie, currentTime, duration) {
+    if (!movie || !currentTime || currentTime < 10) return;
+    const progressPercent = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
+    
+    // Remove if already exists
+    state.history = state.history.filter((h) => h.videoUrl !== movie.videoUrl);
+
+    // Prepend to start of history
+    state.history.unshift({
+      id: movie.id,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
+      videoUrl: movie.videoUrl,
+      category: movie.category,
+      quality: movie.quality,
+      currentTime: currentTime,
+      duration: duration || 0,
+      progressPercent: progressPercent,
+      timestamp: Date.now()
+    });
+
+    // Keep maximum 15 items
+    if (state.history.length > 15) {
+      state.history = state.history.slice(0, 15);
+    }
+
+    try {
+      localStorage.setItem('movielist_history', JSON.stringify(state.history));
+    } catch (e) {}
+
+    renderContinueWatching();
+  }
+
+  function removeHistory(videoUrl, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    state.history = state.history.filter((h) => h.videoUrl !== videoUrl);
+    try {
+      localStorage.setItem('movielist_history', JSON.stringify(state.history));
+      localStorage.removeItem(`movielist_resume_${videoUrl}`);
+    } catch (e) {}
+    showToast('Removed from Continue Watching');
+    renderContinueWatching();
+  }
+
+  function renderContinueWatching() {
+    const section = document.getElementById('continueWatchingSection');
+    const slider = document.getElementById('continueWatchingSlider');
+    if (!section || !slider) return;
+
+    if (!state.history || state.history.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'flex';
+    slider.innerHTML = state.history
+      .map((item) => {
+        const percent = item.progressPercent || 10;
+        return `
+          <div class="cw-card" onclick="window.MovieList.playMovie('${escapeQuotes(item.videoUrl)}', '${escapeQuotes(item.title)}')">
+            <div class="cw-thumbnail-wrap">
+              <img class="cw-thumbnail-img" src="${sanitizeUrl(item.posterUrl)}" alt="${escapeQuotes(item.title)}" loading="lazy" onerror="this.src='icons/icon-512.png'">
+              <div class="cw-play-btn">
+                <i data-lucide="play" style="width:20px;height:20px;fill:currentColor;"></i>
+              </div>
+              <button class="cw-remove-btn" onclick="window.MovieList.removeHistory('${escapeQuotes(item.videoUrl)}', event)" title="Remove from list">
+                <i data-lucide="x" style="width:14px;height:14px;"></i>
+              </button>
+            </div>
+            <div class="cw-progress-track">
+              <div class="cw-progress-fill" style="width: ${percent}%;"></div>
+            </div>
+            <div class="cw-info">
+              <h4 class="cw-card-title">${escapeHtml(item.title)}</h4>
+              <div class="cw-card-meta">
+                <span>${escapeHtml(item.category || 'Movie')}</span>
+                <span>${percent}% watched</span>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    if (window.lucide) window.lucide.createIcons({ root: slider });
+  }
+
   // Toast Notification System
   function showToast(message) {
     const container = document.getElementById('toastContainer');
@@ -194,7 +297,6 @@
     const all = [];
     const seenUrls = new Set();
 
-    // Helper to map array format [rawTitle, posterUrl, videoUrl, category, tag, size, date]
     function mapItem(item, fallbackCategory) {
       const rawTitle = item[0] || '';
       const posterUrl = item[1] || '';
@@ -206,7 +308,6 @@
 
       const { title, year, quality } = cleanTitle(rawTitle);
 
-      // Estimate rating based on category
       let rating = '8.2';
       if (/top rated|top-250/i.test(category) || /top rated/i.test(tag)) rating = '8.9';
       else if (/animation/i.test(category)) rating = '8.4';
@@ -229,7 +330,6 @@
       };
     }
 
-    // Process Carousel
     if (Array.isArray(data.carousel)) {
       state.carouselMovies = data.carousel.map((item) => mapItem(item, 'Featured'));
       state.carouselMovies.forEach((m) => {
@@ -240,7 +340,6 @@
       });
     }
 
-    // Process Categories
     if (data.categories && typeof data.categories === 'object') {
       state.categories = {};
       for (const [catName, items] of Object.entries(data.categories)) {
@@ -260,10 +359,10 @@
     state.allMovies = all;
     renderHeroCarousel();
     filterAndRenderGrid();
+    loadHistory();
   }
 
   function processFallbackData() {
-    // Graceful fallback movies if home_data.json is missing
     const fallbacks = [
       {
         id: '1',
@@ -299,6 +398,7 @@
     state.categories = { 'Top Rated': fallbacks };
     renderHeroCarousel();
     filterAndRenderGrid();
+    loadHistory();
   }
 
   // Hero Carousel Component
@@ -333,6 +433,10 @@
                 <button class="btn-solid-primary" onclick="window.MovieList.playMovie('${escapeQuotes(movie.videoUrl)}', '${escapeQuotes(movie.title)}')">
                   <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
                   Watch Now
+                </button>
+                <button class="btn-glass" onclick="window.MovieList.openTrailer('${escapeQuotes(movie.title)}')">
+                  <i data-lucide="film" style="width:16px;height:16px;"></i>
+                  Trailer
                 </button>
                 <button class="btn-glass" onclick="window.MovieList.openDetails('${escapeQuotes(movie.id)}')">
                   <i data-lucide="info" style="width:16px;height:16px;"></i>
@@ -387,15 +491,14 @@
     state.slideInterval = setInterval(nextSlide, 6500);
   }
 
-  function stopCarouselAuto() {
-    clearInterval(state.slideInterval);
-  }
-
   // Filtering, Searching & Sorting
   function setCategory(cat) {
     state.activeCategory = cat;
     document.querySelectorAll('.category-pill').forEach((pill) => {
       pill.classList.toggle('active', pill.dataset.category === cat);
+    });
+    document.querySelectorAll('.nav-link').forEach((link) => {
+      link.classList.toggle('active', link.dataset.category === cat);
     });
     filterAndRenderGrid();
   }
@@ -413,7 +516,6 @@
   function filterAndRenderGrid() {
     let list = [...state.allMovies];
 
-    // Filter by Watchlist view
     if (state.activeCategory === 'Watchlist') {
       list = list.filter((m) => state.watchlist.has(m.videoUrl));
     } else if (state.activeCategory !== 'All') {
@@ -425,7 +527,6 @@
       }
     }
 
-    // Filter by search query
     if (state.searchQuery) {
       const q = state.searchQuery;
       list = list.filter((m) => {
@@ -437,7 +538,6 @@
       });
     }
 
-    // Apply Sorting
     if (state.sortBy === 'rating') {
       list.sort((a, b) => parseFloat(b.rating || 0) - parseFloat(a.rating || 0));
     } else if (state.sortBy === 'year') {
@@ -450,7 +550,6 @@
     renderGrid();
   }
 
-  // Grid Rendering Component
   function renderGrid() {
     const grid = document.getElementById('moviesGrid');
     const badge = document.getElementById('catalogCountBadge');
@@ -545,6 +644,13 @@
       };
     }
 
+    const trailerBtn = document.getElementById('modalTrailerBtn');
+    if (trailerBtn) {
+      trailerBtn.onclick = () => {
+        openTrailer(movie.title);
+      };
+    }
+
     const watchBtn = document.getElementById('modalWatchlistBtn');
     if (watchBtn) {
       watchBtn.innerHTML = `
@@ -555,6 +661,19 @@
         toggleWatchlist(movie.videoUrl, movie.title, e);
       };
     }
+
+    // Configure External Player Buttons
+    const btnVlc = document.getElementById('extBtnVlc');
+    if (btnVlc) btnVlc.onclick = () => launchVLC(movie.videoUrl);
+
+    const btnMx = document.getElementById('extBtnMx');
+    if (btnMx) btnMx.onclick = () => launchMX(movie.videoUrl);
+
+    const btnPot = document.getElementById('extBtnPot');
+    if (btnPot) btnPot.onclick = () => launchPotPlayer(movie.videoUrl);
+
+    const btnCopy = document.getElementById('extBtnCopy');
+    if (btnCopy) btnCopy.onclick = () => copyStreamLink(movie.videoUrl);
 
     modal.classList.add('active');
     if (window.lucide) window.lucide.createIcons({ root: modal });
@@ -579,7 +698,60 @@
     }
   }
 
-  // Built-in Video Player Modal Component
+  // External Player Launchers
+  function launchVLC(url) {
+    if (!url) return;
+    window.location.href = `vlc://${url}`;
+    showToast('Dispatching stream to VLC Player...');
+  }
+
+  function launchMX(url) {
+    if (!url) return;
+    const intentUrl = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;type=video/*;end`;
+    window.location.href = intentUrl;
+    showToast('Dispatching stream to MX Player...');
+  }
+
+  function launchPotPlayer(url) {
+    if (!url) return;
+    window.location.href = `potplayer://${url}`;
+    showToast('Dispatching stream to PotPlayer...');
+  }
+
+  function copyStreamLink(url) {
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Direct stream link copied to clipboard!');
+    }).catch(() => {
+      showToast('Copied: ' + url);
+    });
+  }
+
+  // Trailer Preview Modal
+  function openTrailer(title) {
+    const trailerModal = document.getElementById('trailerModal');
+    const iframe = document.getElementById('trailerIframe');
+    const trailerTitle = document.getElementById('trailerMovieTitle');
+    if (!trailerModal || !iframe) return;
+
+    if (trailerTitle) trailerTitle.textContent = `${title} - Official Trailer`;
+    
+    // Clean YouTube embed search query without cookies
+    const query = encodeURIComponent(`${title} official trailer`);
+    iframe.src = `https://www.youtube-nocookie.com/embed?listType=search&list=${query}&autoplay=1`;
+
+    trailerModal.classList.add('active');
+    if (window.lucide) window.lucide.createIcons({ root: trailerModal });
+  }
+
+  function closeTrailer() {
+    const trailerModal = document.getElementById('trailerModal');
+    const iframe = document.getElementById('trailerIframe');
+    if (iframe) iframe.src = '';
+    if (trailerModal) trailerModal.classList.remove('active');
+  }
+
+  // Built-in Video Player & Ambilight Engine
   function playMovie(url, title) {
     const playerModal = document.getElementById('playerModal');
     const video = document.getElementById('cinemaVideo');
@@ -588,29 +760,48 @@
 
     if (titleEl) titleEl.textContent = title || 'Playing Media';
 
-    // Direct HTML5 video assignment with sound enabled by default!
+    // Find full movie record for progress saving
+    const currentMovie = state.allMovies.find((m) => m.videoUrl === url) || {
+      id: url,
+      title: title,
+      posterUrl: '',
+      videoUrl: url,
+      category: 'Movie',
+      quality: 'HD'
+    };
+
     video.src = sanitizeUrl(url);
     video.volume = 1.0;
     video.muted = false;
 
     playerModal.classList.add('active');
 
-    // Restore saved playback position if available
+    // Restore saved playback position
     const resumeKey = `movielist_resume_${url}`;
     const savedTime = parseFloat(localStorage.getItem(resumeKey) || '0');
     if (savedTime > 15) {
       video.currentTime = savedTime;
     }
 
-    // Save playback progress on timeupdate
+    // Save playback progress on timeupdate & update continue watching
     video.ontimeupdate = () => {
       if (video.currentTime > 5) {
         localStorage.setItem(resumeKey, String(video.currentTime));
       }
+      if (video.currentTime > 10) {
+        saveWatchProgress(currentMovie, video.currentTime, video.duration);
+      }
+    };
+
+    video.onplay = () => {
+      startAmbilightLoop();
+    };
+
+    video.onpause = () => {
+      stopAmbilightLoop();
     };
 
     video.play().catch(() => {
-      // If browser blocks unmuted autoplay, mute once and prompt
       video.muted = true;
       video.play().catch(() => {});
       showToast('Click unmute on player controls to enable sound');
@@ -620,6 +811,7 @@
   function closePlayer() {
     const playerModal = document.getElementById('playerModal');
     const video = document.getElementById('cinemaVideo');
+    stopAmbilightLoop();
     if (video) {
       video.pause();
       video.removeAttribute('src');
@@ -630,22 +822,81 @@
     }
   }
 
+  // Dynamic Ambilight Frame Sampler Loop
+  function startAmbilightLoop() {
+    if (!state.ambilightEnabled) return;
+    const canvas = document.getElementById('playerAmbilightCanvas');
+    const video = document.getElementById('cinemaVideo');
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    stopAmbilightLoop();
+
+    function renderAmbilight() {
+      if (!video.paused && !video.ended && video.readyState >= 2) {
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        } catch (e) {}
+      }
+      state.ambilightLoopId = requestAnimationFrame(renderAmbilight);
+    }
+
+    state.ambilightLoopId = requestAnimationFrame(renderAmbilight);
+  }
+
+  function stopAmbilightLoop() {
+    if (state.ambilightLoopId) {
+      cancelAnimationFrame(state.ambilightLoopId);
+      state.ambilightLoopId = null;
+    }
+  }
+
+  function toggleAmbilight() {
+    state.ambilightEnabled = !state.ambilightEnabled;
+    const cinemaBox = document.querySelector('.player-cinema-box');
+    const btn = document.getElementById('btnToggleAmbilight');
+    if (cinemaBox) {
+      cinemaBox.classList.toggle('ambilight-off', !state.ambilightEnabled);
+    }
+    if (btn) {
+      btn.classList.toggle('active', state.ambilightEnabled);
+    }
+    if (state.ambilightEnabled) {
+      startAmbilightLoop();
+      showToast('Ambilight glow enabled');
+    } else {
+      stopAmbilightLoop();
+      showToast('Ambilight glow disabled');
+    }
+  }
+
+  function setPlaybackSpeed(speed) {
+    const video = document.getElementById('cinemaVideo');
+    if (video) {
+      video.playbackRate = parseFloat(speed);
+      showToast(`Playback speed set to ${speed}x`);
+    }
+  }
+
   // Global Keyboard Navigation
   function setupKeybindings() {
     document.addEventListener('keydown', (e) => {
       const playerModal = document.getElementById('playerModal');
       const detailsModal = document.getElementById('detailsModal');
+      const trailerModal = document.getElementById('trailerModal');
       const video = document.getElementById('cinemaVideo');
 
       if (e.key === 'Escape') {
-        if (playerModal && playerModal.classList.contains('active')) {
+        if (trailerModal && trailerModal.classList.contains('active')) {
+          closeTrailer();
+        } else if (playerModal && playerModal.classList.contains('active')) {
           closePlayer();
         } else if (detailsModal && detailsModal.classList.contains('active')) {
           closeDetails();
         }
       }
 
-      // In Player Controls
+      // Player hotkeys
       if (playerModal && playerModal.classList.contains('active') && video) {
         if (e.key === ' ' || e.key === 'k') {
           e.preventDefault();
@@ -667,14 +918,13 @@
     });
   }
 
-  // Initialization Routine
+  // Initialization
   function init() {
     initTheme();
     loadWatchlist();
     loadCatalog();
     setupKeybindings();
 
-    // Search Input Listener with Debounce
     const searchInput = document.getElementById('searchInput');
     let searchDebounce = null;
     if (searchInput) {
@@ -686,7 +936,6 @@
       });
     }
 
-    // Close Modals on Backdrop Click
     const detailsModal = document.getElementById('detailsModal');
     if (detailsModal) {
       detailsModal.addEventListener('click', (e) => {
@@ -701,10 +950,17 @@
       });
     }
 
+    const trailerModal = document.getElementById('trailerModal');
+    if (trailerModal) {
+      trailerModal.addEventListener('click', (e) => {
+        if (e.target === trailerModal) closeTrailer();
+      });
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
-  // Public Interface for Inline Event Handlers
+  // Public API
   window.MovieList = {
     setCategory,
     setSort,
@@ -715,10 +971,19 @@
       startCarouselAuto();
     },
     toggleWatchlist,
+    removeHistory,
     openDetails,
     closeDetails,
+    openTrailer,
+    closeTrailer,
     playMovie,
     closePlayer,
+    toggleAmbilight,
+    setPlaybackSpeed,
+    launchVLC,
+    launchMX,
+    launchPotPlayer,
+    copyStreamLink,
     toggleTheme
   };
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="theme-color" content="#050811">
-  <meta name="description" content="MovieList - Modern Glassmorphism Cinema Streaming Platform">
+  <meta name="description" content="MovieList - Modern Glassmorphism Cinema Streaming Platform with Cinema Suite">
   <title>MovieList - Modern Cinema Streaming</title>
   
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
@@ -77,6 +77,17 @@
 
       <!-- Dot Indicators -->
       <div class="carousel-indicators" id="carouselIndicators"></div>
+    </section>
+
+    <!-- Continue Watching Shelf -->
+    <section class="continue-watching-section" id="continueWatchingSection" style="display: none;" aria-label="Continue Watching">
+      <div class="cw-header-row">
+        <h3 class="cw-title">
+          <i data-lucide="history" style="width:20px;height:20px;color:var(--primary);"></i>
+          <span>Continue Watching</span>
+        </h3>
+      </div>
+      <div class="cw-slider" id="continueWatchingSlider"></div>
     </section>
 
     <!-- Filtering & Category Shelf -->
@@ -184,33 +195,93 @@
           </div>
         </div>
 
+        <!-- Action Buttons Row -->
         <div class="modal-actions-row">
           <button class="btn-solid-primary" id="modalPlayBtn">
             <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
             Play Movie
+          </button>
+          <button class="btn-glass" id="modalTrailerBtn">
+            <i data-lucide="film" style="width:16px;height:16px;"></i>
+            Watch Trailer
           </button>
           <button class="btn-glass" id="modalWatchlistBtn">
             <i data-lucide="bookmark" style="width:16px;height:16px;"></i>
             Add to Watchlist
           </button>
         </div>
+
+        <!-- External Player Launchers Hub -->
+        <div class="external-players-card">
+          <span class="external-players-title">Launch in External App</span>
+          <div class="external-players-grid">
+            <button class="btn-ext-player btn-ext-vlc" id="extBtnVlc" title="Play in VLC Media Player">
+              <i data-lucide="play-circle" style="width:14px;height:14px;"></i>
+              VLC Player
+            </button>
+            <button class="btn-ext-player btn-ext-mx" id="extBtnMx" title="Play in MX Player (Android)">
+              <i data-lucide="smartphone" style="width:14px;height:14px;"></i>
+              MX Player
+            </button>
+            <button class="btn-ext-player btn-ext-pot" id="extBtnPot" title="Play in PotPlayer (Windows)">
+              <i data-lucide="monitor" style="width:14px;height:14px;"></i>
+              PotPlayer
+            </button>
+            <button class="btn-ext-player btn-ext-copy" id="extBtnCopy" title="Copy Direct Video Link">
+              <i data-lucide="copy" style="width:14px;height:14px;"></i>
+              Copy Stream Link
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Built-In Video Player Modal -->
+  <!-- Built-In Video Player Modal with Dynamic Ambilight -->
   <div class="player-modal-overlay" id="playerModal" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
     <div class="player-cinema-box">
+      <!-- Dynamic Ambilight Canvas -->
+      <canvas id="playerAmbilightCanvas" class="player-ambilight-canvas" width="64" height="36"></canvas>
+
       <div class="player-top-header">
         <div class="player-title-info">
           <i data-lucide="tv" style="width:18px;height:18px;color:var(--primary);"></i>
           <span class="player-media-title" id="playerTitle">Playing Media</span>
         </div>
-        <button class="player-exit-btn" onclick="window.MovieList.closePlayer()" title="Exit Player (Esc)" aria-label="Exit Player">
+        <div class="player-controls-top-right">
+          <select class="player-speed-select" onchange="window.MovieList.setPlaybackSpeed(this.value)" title="Playback Speed">
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1.0x (Normal)</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+          <button class="player-pill-btn active" id="btnToggleAmbilight" onclick="window.MovieList.toggleAmbilight()" title="Toggle Ambilight Glow">
+            <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+            <span>Ambilight</span>
+          </button>
+          <button class="player-exit-btn" onclick="window.MovieList.closePlayer()" title="Exit Player (Esc)" aria-label="Exit Player">
+            <i data-lucide="x" style="width:18px;height:18px;"></i>
+          </button>
+        </div>
+      </div>
+      <video id="cinemaVideo" class="cinema-video-el" controls playsinline preload="auto"></video>
+    </div>
+  </div>
+
+  <!-- Trailer Preview Modal -->
+  <div class="trailer-modal-overlay" id="trailerModal" role="dialog" aria-modal="true" aria-labelledby="trailerMovieTitle">
+    <div class="trailer-cinema-box">
+      <div class="player-top-header">
+        <div class="player-title-info">
+          <i data-lucide="film" style="width:18px;height:18px;color:var(--accent);"></i>
+          <span class="player-media-title" id="trailerMovieTitle">Trailer Preview</span>
+        </div>
+        <button class="player-exit-btn" onclick="window.MovieList.closeTrailer()" title="Exit Trailer (Esc)" aria-label="Exit Trailer">
           <i data-lucide="x" style="width:18px;height:18px;"></i>
         </button>
       </div>
-      <video id="cinemaVideo" class="cinema-video-el" controls playsinline preload="auto"></video>
+      <iframe id="trailerIframe" class="trailer-iframe" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
     </div>
   </div>
 
