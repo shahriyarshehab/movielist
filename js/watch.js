@@ -31,6 +31,7 @@ const DEFAULT_PLAYER_SETTINGS = {
   ambientIntensity: 75,
   aspectRatio: 'contain', // contain, cover, 16/9, 4/3, 21/9
   videoQuality: '1080p', // auto, 1080p, 720p, 480p, 360p
+  defaultPlayer: 'browser', // browser, vlc, mx, pot
   subSize: 18,
   subColor: '#ffffff',
   subColorName: 'White',
@@ -754,9 +755,9 @@ function renderWatchPage(rawItem) {
             </button>
         `
             : `
-            <button class="mb-btn-primary" onclick="enterPlayerMode()">
+            <button class="mb-btn-primary" onclick="handleDefaultPlay()">
                 <i data-lucide="play" style="fill: currentColor; width: 16px; height: 16px;"></i>
-                <span>Watch Online</span>
+                <span>Watch in Browser</span>
             </button>
         `
         }
@@ -960,7 +961,14 @@ function toggleSynopsis() {
 
 function playFirstEpisodeOrScroll() {
   if (currentSeasonEpisodes && currentSeasonEpisodes.length > 0) {
-    playSpecificEpisode(0);
+    const pref = playerSettings.defaultPlayer || 'browser';
+    if (pref !== 'browser') {
+      const ep = currentSeasonEpisodes[0];
+      const fullTitle = `${currentSeasonName || 'Episode'} • ${ep.name}`;
+      handleDefaultPlay(ep.url, fullTitle);
+    } else {
+      playSpecificEpisode(0);
+    }
   } else {
     scrollTvExplorer();
   }
@@ -1873,8 +1881,41 @@ function downloadSeasonM3u() {
 }
 
 // ==========================================
-//  External Player Launchers
+//  External & Default Player Launchers
 // ==========================================
+function setDefaultPlayer(playerType) {
+  playerSettings.defaultPlayer = playerType || 'browser';
+  savePlayerSettings();
+  updateCustomizerUIState();
+  const playerNames = {
+    browser: 'Browser (Built-in)',
+    vlc: 'VLC Media Player',
+    mx: 'MX Player',
+    pot: 'PotPlayer'
+  };
+  showToast(`Default player set to ${playerNames[playerSettings.defaultPlayer] || 'Browser (Built-in)'}`);
+}
+
+function handleDefaultPlay(url, title) {
+  const targetUrl = url || currentActiveStreamUrl || (currentItem ? currentItem.url : '');
+  const targetTitle = title || currentActiveStreamTitle || (currentItem ? currentItem.title : '');
+  const pref = playerSettings.defaultPlayer || 'browser';
+
+  if (pref === 'vlc') {
+    openInVLC(targetUrl, targetTitle);
+  } else if (pref === 'mx') {
+    openInMXPlayer(targetUrl, targetTitle);
+  } else if (pref === 'pot') {
+    openInPotPlayer(targetUrl, targetTitle);
+  } else {
+    enterPlayerMode(targetUrl, targetTitle);
+  }
+}
+
+function openExternalPlayerModal(url, title) {
+  return openExternalPlayersModal(url, title);
+}
+
 function openInVLC(url, title) {
   url = url || currentActiveStreamUrl || (currentItem ? currentItem.url : '');
   title = title || currentActiveStreamTitle || (currentItem ? currentItem.title : 'Movie');
@@ -2041,7 +2082,7 @@ function resetPlayerSettingsToDefaults() {
   } catch (e) {}
 
   applyAllPlayerSettings();
-  showToast('Player customizations reset to default ↺');
+  showToast('Player customizations reset to default');
 }
 
 function updateCustomizerUIState() {
@@ -2166,6 +2207,26 @@ function updateCustomizerUIState() {
   });
   const themeNameEl = document.getElementById('valThemeActiveName');
   if (themeNameEl) themeNameEl.textContent = playerSettings.themeTitle || 'Cyber Cyan';
+
+  // Default Player chips & badge
+  const defPlayer = playerSettings.defaultPlayer || 'browser';
+  const playerNames = {
+    browser: 'Browser (Built-in)',
+    vlc: 'VLC Media Player',
+    mx: 'MX Player',
+    pot: 'PotPlayer'
+  };
+  const valDefPlayerEl = document.getElementById('valDefaultPlayerText');
+  if (valDefPlayerEl) valDefPlayerEl.textContent = playerNames[defPlayer] || 'Browser (Built-in)';
+
+  const chipBrowser = document.getElementById('chipPlayerBrowser');
+  const chipVlc = document.getElementById('chipPlayerVlc');
+  const chipMx = document.getElementById('chipPlayerMx');
+  const chipPot = document.getElementById('chipPlayerPot');
+  if (chipBrowser) chipBrowser.classList.toggle('active', defPlayer === 'browser');
+  if (chipVlc) chipVlc.classList.toggle('active', defPlayer === 'vlc');
+  if (chipMx) chipMx.classList.toggle('active', defPlayer === 'mx');
+  if (chipPot) chipPot.classList.toggle('active', defPlayer === 'pot');
 }
 
 // ==========================================
@@ -3694,5 +3755,9 @@ document.addEventListener('keydown', (e) => {
     closeDownloadModal();
   }
 });
+
+window.handleDefaultPlay = handleDefaultPlay;
+window.setDefaultPlayer = setDefaultPlayer;
+window.openExternalPlayerModal = openExternalPlayerModal;
 
 window.onload = initWatch;

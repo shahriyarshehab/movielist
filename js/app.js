@@ -479,7 +479,7 @@ function setupCarousel(moviesList) {
                         <span>${m.category || 'Cinema'}</span>
                     </div>
                     <div style="display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap;">
-                        <a class="btn btn-primary" href="${linkUrl}">
+                        <a class="btn btn-primary" href="${linkUrl}&play=1">
                             <i data-lucide="play" style="fill: currentColor; width: 14px; height: 14px;"></i>
                             <span>Watch Now</span>
                         </a>
@@ -576,7 +576,7 @@ function renderContinueWatchingHtml() {
                 ${history
                   .map((item) => {
                     const itemData = encodeURIComponent(JSON.stringify(item));
-                    const linkUrl = `watch.html?title=${encodeURIComponent(item.title)}&data=${itemData}`;
+                    const linkUrl = `watch.html?title=${encodeURIComponent(item.title)}&data=${itemData}&play=1`;
                     const timeLeft = Math.max(1, Math.round((item.duration - item.time) / 60));
                     const cleanTitle = typeof getCleanMovieTitle === 'function' ? getCleanMovieTitle(item.title) : item.title;
 
@@ -977,7 +977,7 @@ function renderWatchlistCardHtml(rawItem, tab) {
     typeof isMediaSeries === 'function'
       ? isMediaSeries(item)
       : item.tag === 'TV Series' || item.tag === 'K-Drama' || (item.url && item.url.endsWith('/'));
-  const linkUrl = `watch.html?title=${encodeURIComponent(rawTitle)}&data=${itemData}`;
+  const linkUrl = `watch.html?title=${encodeURIComponent(rawTitle)}&data=${itemData}${tab === 'history' ? '&play=1' : ''}`;
   let markerHtml = getMediaReleaseMarker(item.date);
   const isMarked = typeof isMarkedForUpdate === 'function' && isMarkedForUpdate(rawTitle);
   if (isMarked) {

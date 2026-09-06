@@ -296,6 +296,17 @@
             <span style="font-size: 11.5px; color: var(--text-muted)">Ultra-speed BDIX Playback</span>
           </div>
           <div class="player-hub-grid">
+            <!-- Browser Player (Default) -->
+            <button
+              class="btn btn-primary"
+              onclick="enterPlayerMode()"
+              style="min-height: 42px; font-size: 13px; padding: 9px 16px"
+              title="Stream directly in Browser Player (Built-in)"
+            >
+              <i data-lucide="play" style="fill: currentColor"></i>
+              <span>Browser Player (Default)</span>
+            </button>
+
             <!-- VLC Media Player -->
             <button
               class="btn btn-vlc"
@@ -551,7 +562,7 @@
                     <i data-lucide="server" style="width: 13px; height: 13px;"></i>
                     <span>Next Server Mirror</span>
                   </button>
-                  <button class="btn btn-ghost" onclick="openExternalPlayerModal()">
+                  <button class="btn btn-ghost" onclick="openExternalPlayersModal()">
                     <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
                     <span>Play in VLC / MX</span>
                   </button>
@@ -1204,6 +1215,28 @@
         </div>
         <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
           <div class="ext-player-list" style="display: flex; flex-direction: column; gap: 10px">
+            <!-- In-Browser Web Player (Default) -->
+            <div class="ext-player-card" onclick="closeExternalPlayersModal(); enterPlayerMode();">
+              <div
+                class="ext-icon-badge"
+                style="background: rgba(0, 229, 255, 0.15); border-color: rgba(0, 229, 255, 0.4); color: var(--primary)"
+              >
+                <i data-lucide="play" style="fill: currentColor"></i>
+              </div>
+              <div class="ext-details">
+                <div class="ext-title-row">
+                  <span class="ext-name">Browser Player (Built-in)</span>
+                  <span class="ext-pill-rec" style="background: rgba(0, 229, 255, 0.2); color: var(--primary); border: 1px solid rgba(0, 229, 255, 0.4)">Default</span>
+                </div>
+                <div class="ext-desc">
+                  Native in-browser cinema player with instant start, subtitles, keyboard shortcuts, and full cinema controls.
+                </div>
+              </div>
+              <button class="btn btn-primary" style="padding: 7px 14px; font-size: 12px; border-radius: 20px">
+                <span>Play in Browser</span>
+              </button>
+            </div>
+
             <!-- VLC Media Player -->
             <div class="ext-player-card" onclick="openCurrentInVLC()">
               <div
@@ -1215,7 +1248,6 @@
               <div class="ext-details">
                 <div class="ext-title-row">
                   <span class="ext-name">VLC Media Player</span>
-                  <span class="ext-pill-rec">Recommended</span>
                 </div>
                 <div class="ext-desc">
                   Direct stream playback on Mobile (Android Intent) and Web/Desktop without downloading any files.
@@ -1435,7 +1467,7 @@
           </button>
           <button class="custom-tab-btn" id="tabBtnPlayback" onclick="switchCustomTab('tabPlayback')">
             <i data-lucide="touchpad"></i>
-            <span>Gestures & Touch</span>
+            <span>Playback & Touch</span>
           </button>
           <button class="custom-tab-btn" id="tabBtnThemes" onclick="switchCustomTab('tabThemes')">
             <i data-lucide="palette"></i>
@@ -1840,6 +1872,20 @@
           <!--  TAB 4: PLAYBACK & TOUCH GESTURES            -->
           <!-- ============================================== -->
           <div class="custom-tab-panel" id="tabPlayback">
+            <!-- Default Media Player -->
+            <div class="custom-section-block">
+              <div class="custom-block-label">
+                <span>Default Media Player</span>
+                <span class="custom-badge" id="valDefaultPlayerText">Browser (Built-in)</span>
+              </div>
+              <div class="custom-choice-row">
+                <button class="choice-chip active" id="chipPlayerBrowser" onclick="setDefaultPlayer('browser')">Browser (Default)</button>
+                <button class="choice-chip" id="chipPlayerVlc" onclick="setDefaultPlayer('vlc')">VLC Player</button>
+                <button class="choice-chip" id="chipPlayerMx" onclick="setDefaultPlayer('mx')">MX Player</button>
+                <button class="choice-chip" id="chipPlayerPot" onclick="setDefaultPlayer('pot')">PotPlayer</button>
+              </div>
+            </div>
+
             <!-- Double Tap Seek Interval -->
             <div class="custom-section-block">
               <div class="custom-block-label">
