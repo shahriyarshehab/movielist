@@ -1046,14 +1046,6 @@ function setupPlayerListeners() {
       );
     }
 
-    // Sync external audio if playing
-    if (externalAudioPlayer && !player.paused) {
-      const expectedTime = Math.max(0, player.currentTime + (playerSettings.externalAudioOffset || 0));
-      if (Math.abs(externalAudioPlayer.currentTime - expectedTime) > 0.35) {
-        externalAudioPlayer.currentTime = expectedTime;
-      }
-    }
-
     // Update custom scrubber & time text
     updateScrubberProgress();
 
@@ -1078,13 +1070,6 @@ function setupPlayerListeners() {
   player.addEventListener('play', () => {
     updatePlayPauseButtonUI(true);
     updateVolumeUI();
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    if (externalAudioPlayer) {
-      externalAudioPlayer.currentTime = Math.max(0, player.currentTime + (playerSettings.externalAudioOffset || 0));
-      externalAudioPlayer.play().catch(() => {});
-    }
     if (playerSettings.wakeLock) {
       acquireWakeLock();
     }
@@ -1093,9 +1078,6 @@ function setupPlayerListeners() {
 
   player.addEventListener('pause', () => {
     updatePlayPauseButtonUI(false);
-    if (externalAudioPlayer) {
-      externalAudioPlayer.pause();
-    }
     savePlaybackProgress(
       currentActiveStreamUrl,
       currentActiveStreamTitle,
@@ -1105,29 +1087,8 @@ function setupPlayerListeners() {
     );
   });
 
-  player.addEventListener('seeking', () => {
-    if (externalAudioPlayer) {
-      externalAudioPlayer.currentTime = Math.max(0, player.currentTime + (playerSettings.externalAudioOffset || 0));
-    }
-  });
-
-  player.addEventListener('seeked', () => {
-    if (externalAudioPlayer) {
-      externalAudioPlayer.currentTime = Math.max(0, player.currentTime + (playerSettings.externalAudioOffset || 0));
-    }
-  });
-
-  player.addEventListener('ratechange', () => {
-    if (externalAudioPlayer) {
-      externalAudioPlayer.playbackRate = player.playbackRate;
-    }
-  });
-
   player.addEventListener('ended', () => {
     updatePlayPauseButtonUI(false);
-    if (externalAudioPlayer) {
-      externalAudioPlayer.pause();
-    }
     savePlaybackProgress(
       currentActiveStreamUrl,
       currentActiveStreamTitle,
@@ -1148,15 +1109,11 @@ function setupPlayerListeners() {
 
   player.addEventListener('volumechange', () => {
     updateVolumeUI();
-    if (externalAudioPlayer && playerSettings.audioTrackMode === 'external') {
-      externalAudioPlayer.volume = player.volume;
-    }
   });
 
   player.addEventListener('loadedmetadata', () => {
     updateScrubberProgress();
     applyAspectRatioCss();
-    detectAndRenderAudioTracks();
     updateYouTubeMenuState();
     if (playerSettings.defaultSpeed && playerSettings.defaultSpeed !== 1.0) {
       player.playbackRate = playerSettings.defaultSpeed;
@@ -1165,100 +1122,6 @@ function setupPlayerListeners() {
 }
 
 let hlsPlayerInstance = null;
-let currentActiveServerIdx = 0;
-let availableServerMirrors = [];
-
-function generateAvailableServerMirrors(primaryUrl, movieObj) {
-  const mirrors = [];
-  const rawUrl = primaryUrl || (movieObj ? movieObj.url : '');
-  if (!rawUrl) return mirrors;
-
-  if (rawUrl.includes('elaach.com')) {
-    mirrors.push({
-      name: 'Server 1 (Elaach BDIX)',
-      desc: 'Triangle Services BDIX Mirror',
-      url: rawUrl
-    });
-    mirrors.push({
-      name: 'Server 2 (DhakaFlix)',
-      desc: 'DhakaFlix BDIX Mirror',
-      url: rawUrl
-    });
-    mirrors.push({
-      name: 'Server 3 (SamOnline)',
-      desc: 'SamOnline BDIX Mirror',
-      url: rawUrl
-    });
-    return mirrors;
-  }
-
-  // 1. Primary Node (DhakaFlix 1080p Web-DL)
-  mirrors.push({
-    name: 'Server 1 (DhakaFlix)',
-    desc: 'Direct 1080p Ultra-Speed BDIX Node',
-    url: rawUrl
-  });
-
-  // 2. Secondary Node (SamOnline Mirror)
-  let samUrl = rawUrl;
-  if (rawUrl.includes('172.16.50.14')) {
-    samUrl = rawUrl.replace('172.16.50.14/DHAKA-FLIX-14', '172.16.50.7/DHAKA-FLIX-7');
-  } else if (rawUrl.includes('172.16.50.7')) {
-    samUrl = rawUrl.replace('172.16.50.7/DHAKA-FLIX-7', '172.16.50.14/DHAKA-FLIX-14');
-  } else if (rawUrl.includes('172.16.50.12')) {
-    samUrl = rawUrl.replace('172.16.50.12/DHAKA-FLIX-12', '172.16.50.4/DHAKA-FLIX-4');
-  }
-  mirrors.push({
-    name: 'Server 2 (SamOnline)',
-    desc: 'High-Speed Secondary Node',
-    url: samUrl
-  });
-
-  // 3. Third Node (Elaach / Triangle Mirror)
-  let elaachUrl = rawUrl;
-  if (rawUrl.includes('172.16.50.14')) {
-    elaachUrl = rawUrl.replace('172.16.50.14/DHAKA-FLIX-14', '172.16.50.7/DHAKA-FLIX-7');
-  }
-  mirrors.push({
-    name: 'Server 3 (Elaach Mirror)',
-    desc: 'Alternative BDIX Server Link',
-    url: elaachUrl
-  });
-
-  return mirrors;
-}
-
-function updateServerSelectorUI() {
-  const container = document.getElementById('serverPillsContainer');
-  if (container && availableServerMirrors.length > 0) {
-    container.innerHTML = availableServerMirrors.map((srv, idx) => `
-      <button class="server-pill ${idx === currentActiveServerIdx ? 'active' : ''}" data-serveridx="${idx}" onclick="switchMediaServer(${idx})">
-        <span class="pill-dot"></span>
-        <span>⚡ ${srv.name}</span>
-      </button>
-    `).join('');
-  }
-
-  const ytValServer = document.getElementById('ytValServer');
-  if (ytValServer && availableServerMirrors[currentActiveServerIdx]) {
-    ytValServer.textContent = availableServerMirrors[currentActiveServerIdx].name;
-  }
-
-  const ytList = document.getElementById('ytServerSubmenuList');
-  if (ytList && availableServerMirrors.length > 0) {
-    ytList.innerHTML = availableServerMirrors.map((srv, idx) => `
-      <div class="yt-submenu-item ${idx === currentActiveServerIdx ? 'active' : ''}" data-serveridx="${idx}" onclick="switchMediaServer(${idx})">
-        <div class="yt-submenu-item-main">
-          <span class="yt-opt-title">⚡ ${srv.name}</span>
-          <span class="yt-opt-desc">${srv.desc}</span>
-        </div>
-        <span class="yt-check-icon"><i data-lucide="check"></i></span>
-      </div>
-    `).join('');
-    refreshLucideIcons();
-  }
-}
-
 let motherServerWatchdogTimer = null;
 
 function clearMotherServerWatchdog() {
@@ -1278,72 +1141,9 @@ function startMotherServerWatchdog(player) {
   }, 12000);
 }
 
-function switchMediaServer(serverIdx) {
-  if (!availableServerMirrors[serverIdx]) return;
-  const player = document.getElementById('videoPlayer');
-  if (!player) return;
-
-  clearMotherServerWatchdog();
-  hideMotherServerErrorOverlay();
-
-  const prevTime = player.currentTime;
-  const wasPlaying = !player.paused;
-  currentActiveServerIdx = serverIdx;
-  const targetServer = availableServerMirrors[serverIdx];
-  currentActiveStreamUrl = targetServer.url;
-
-  if (hlsPlayerInstance) {
-    hlsPlayerInstance.destroy();
-    hlsPlayerInstance = null;
-  }
-
-  const isHls = (targetServer.url || '').includes('.m3u8') || (targetServer.url || '').includes('/hls/');
-  if (isHls && typeof Hls !== 'undefined' && Hls.isSupported()) {
-    hlsPlayerInstance = new Hls({ enableWorker: true, lowLatencyMode: true });
-    hlsPlayerInstance.loadSource(targetServer.url);
-    hlsPlayerInstance.attachMedia(player);
-    hlsPlayerInstance.on(Hls.Events.ERROR, (event, data) => {
-      if (data && data.fatal) {
-        handleStreamConnectionError();
-      }
-    });
-  } else {
-    player.src = targetServer.url;
-  }
-
-  player.onerror = () => {
-    clearMotherServerWatchdog();
-    handleStreamConnectionError();
-  };
-
-  const onDataLoaded = () => {
-    clearMotherServerWatchdog();
-    hideMotherServerErrorOverlay();
-  };
-  player.onloadeddata = onDataLoaded;
-  player.oncanplay = onDataLoaded;
-
-  player.addEventListener('loadedmetadata', () => {
-    clearMotherServerWatchdog();
-    hideMotherServerErrorOverlay();
-    if (prevTime > 0) player.currentTime = prevTime;
-    if (wasPlaying) player.play().catch(() => {});
-  }, { once: true });
-
-  startMotherServerWatchdog(player);
-  updateServerSelectorUI();
-  showToast(`Switched to ${targetServer.name}`);
-}
-
 function handleStreamConnectionError(customMsg) {
   clearMotherServerWatchdog();
-  if (availableServerMirrors.length > currentActiveServerIdx + 1) {
-    const nextIdx = currentActiveServerIdx + 1;
-    showToast(`Server ${currentActiveServerIdx + 1} unavailable. Trying Server ${nextIdx + 1}...`);
-    switchMediaServer(nextIdx);
-  } else {
-    showMotherServerErrorOverlay(customMsg);
-  }
+  showMotherServerErrorOverlay(customMsg);
 }
 
 function showMotherServerErrorOverlay(customMsg) {
@@ -1355,16 +1155,14 @@ function showMotherServerErrorOverlay(customMsg) {
   if (msgEl) {
     msgEl.textContent =
       customMsg ||
-      'Unable to establish connection with the BDIX media mother server. Please ensure you are connected to a BDIX broadband network, or switch to an alternate server mirror.';
+      'Unable to establish connection with the BDIX media mother server. Please ensure you are connected to a BDIX broadband network.';
   }
 
   const targetEl = document.getElementById('motherServerTargetInfo');
   if (targetEl && currentActiveStreamUrl) {
     try {
       const parsed = new URL(currentActiveStreamUrl);
-      const srv = availableServerMirrors[currentActiveServerIdx];
-      const srvName = srv ? srv.name : 'Mother Server';
-      targetEl.textContent = `${srvName} • ${parsed.hostname}`;
+      targetEl.textContent = `Mother Server • ${parsed.hostname}`;
       targetEl.style.display = 'inline-block';
     } catch (e) {
       targetEl.style.display = 'none';
@@ -1373,7 +1171,7 @@ function showMotherServerErrorOverlay(customMsg) {
 
   overlay.style.display = 'flex';
   if (typeof refreshLucideIcons === 'function') refreshLucideIcons();
-  showToast('Cannot connect to mother server. Check BDIX network or switch mirror.');
+  showToast('Cannot connect to mother server. Check BDIX network.');
 }
 
 function hideMotherServerErrorOverlay() {
@@ -1390,16 +1188,6 @@ function retryMotherServerConnection() {
   }
 }
 
-function tryNextServerMirror() {
-  if (availableServerMirrors && availableServerMirrors.length > 1) {
-    const nextIdx = (currentActiveServerIdx + 1) % availableServerMirrors.length;
-    hideMotherServerErrorOverlay();
-    switchMediaServer(nextIdx);
-  } else {
-    showToast('No alternate server mirrors found for this media.');
-  }
-}
-
 function startStream(url, title) {
   const player = document.getElementById('videoPlayer');
   if (!player) return;
@@ -1411,10 +1199,6 @@ function startStream(url, title) {
   currentActiveStreamTitle = title || 'Playing Media';
 
   // Initialize server mirrors
-  availableServerMirrors = generateAvailableServerMirrors(url, currentItem);
-  currentActiveServerIdx = 0;
-  updateServerSelectorUI();
-
   const currTitleEl = document.getElementById('playerCurrentTitle');
   if (currTitleEl) currTitleEl.textContent = currentActiveStreamTitle;
   const cpTitleEl = document.getElementById('cpMediaTitle');
@@ -1440,14 +1224,6 @@ function startStream(url, title) {
     });
     hlsPlayerInstance.loadSource(url);
     hlsPlayerInstance.attachMedia(player);
-    hlsPlayerInstance.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-      detectAndRenderAudioTracks();
-      updateYouTubeMenuState();
-    });
-    hlsPlayerInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-      detectAndRenderAudioTracks();
-      updateYouTubeMenuState();
-    });
     hlsPlayerInstance.on(Hls.Events.ERROR, (event, data) => {
       if (data && data.fatal) {
         clearMotherServerWatchdog();
@@ -2687,22 +2463,6 @@ function updateYouTubeMenuState() {
   // Subtitle chips active state in subtitle styling config
   document.querySelectorAll('.yt-chip[data-subsize]').forEach((chip) => {
     chip.classList.toggle('active', parseInt(chip.getAttribute('data-subsize'), 10) === (playerSettings.subSize || 18));
-  });
-
-  // 4. Audio Track
-  const ytValAudio = document.getElementById('ytValAudio');
-  if (ytValAudio) {
-    ytValAudio.textContent = playerSettings.audioTrackTitle || 'Default (Stereo)';
-  }
-
-  // 5. Server Mirror Source
-  const ytValServer = document.getElementById('ytValServer');
-  if (ytValServer && availableServerMirrors[currentActiveServerIdx]) {
-    ytValServer.textContent = availableServerMirrors[currentActiveServerIdx].name;
-  }
-  document.querySelectorAll('#ytServerSubmenuList .yt-submenu-item').forEach((item) => {
-    const sIdx = parseInt(item.getAttribute('data-serveridx'), 10);
-    item.classList.toggle('active', sIdx === currentActiveServerIdx);
   });
 }
 
