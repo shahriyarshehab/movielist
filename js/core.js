@@ -227,7 +227,7 @@ function updateMarkedUpdatesBadge() {
 }
 
 // ==========================================
-// ⏱ Playback History & Resume Engine
+// Playback History & Resume Engine
 // ==========================================
 function getWatchHistory() {
   try {
@@ -284,7 +284,7 @@ function removeWatchHistory(url, event) {
 }
 
 // ==========================================================================
-// 🎬 Real Movie Name & Clean Title Sanitizer Engine
+// Real Movie Name & Clean Title Sanitizer Engine
 // Normalizes messy raw mother-server folder names into clean real titles
 // e.g., "001. The.Shawshank.Redemption.1994.1080p.BluRay.Dual.Audio" -> "The Shawshank Redemption (1994)"
 // ==========================================================================
@@ -716,7 +716,7 @@ if (document.readyState === 'loading') {
 }
 
 // ==========================================
-// 🚀 Modern Live SPA Instant Page Router
+// Modern Live SPA Instant Page Router
 // ==========================================
 function setupSpaPageRouter() {
   document.addEventListener('click', (e) => {

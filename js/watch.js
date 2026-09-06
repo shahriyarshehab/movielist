@@ -1472,7 +1472,7 @@ function toggleSubtitles() {
 }
 
 // ==========================================
-// ⏭ Auto-Play Next Episode
+// Auto-Play Next Episode
 // ==========================================
 function triggerNextEpisodeCountdown() {
   const nextIdx = currentPlayingEpisodeIdx + 1;
@@ -3167,7 +3167,7 @@ function switchCustomTab(tabId) {
 }
 
 // ==========================================
-// ⌨ Comprehensive Keyboard Shortcuts
+// Comprehensive Keyboard Shortcuts
 // ==========================================
 function setupSearchKeybindings() {
   document.addEventListener('keydown', (e) => {

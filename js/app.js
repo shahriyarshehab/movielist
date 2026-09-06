@@ -547,7 +547,7 @@ function goToSlide(idx) {
 }
 
 // ==========================================
-// ⏱ Continue Watching UI
+// Continue Watching UI
 // ==========================================
 function renderContinueWatchingHtml() {
   const history = getWatchHistory();
