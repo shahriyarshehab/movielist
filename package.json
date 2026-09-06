@@ -1,10 +1,10 @@
 {
-  "name": "cinebox",
-  "version": "2.0.0",
-  "description": "CineBox - Ultra-Speed HD Movies, TV Shows & Animation Streaming Platform",
+  "name": "movielist",
+  "version": "1.0.0",
+  "description": "MovieList - Modern Cinema Streaming Platform",
   "main": "server.js",
   "bin": {
-    "cinebox": "./server.js"
+    "movielist": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,7 @@
     "update": "python scripts/auto_update.py"
   },
   "keywords": [
-    "cinebox",
+    "movielist",
     "streaming",
     "video-player",
     "movies",
@@ -28,12 +28,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shahriyarshehab/cinebox.git"
+    "url": "https://github.com/shahriyarshehab/movielist.git"
   },
   "bugs": {
-    "url": "https://github.com/shahriyarshehab/cinebox/issues"
+    "url": "https://github.com/shahriyarshehab/movielist/issues"
   },
-  "homepage": "https://github.com/shahriyarshehab/cinebox#readme",
+  "homepage": "https://github.com/shahriyarshehab/movielist#readme",
   "engines": {
     "node": ">=16.0.0"
   }
