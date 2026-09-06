@@ -21,7 +21,9 @@
     history: [],
     activeMovie: null,
     ambilightEnabled: true,
-    ambilightLoopId: null,
+    extSelectedUrl: '',
+    extSelectedTitle: '',
+    defaultPlayer: localStorage.getItem('movielist_default_player') || '',
     theme: localStorage.getItem('movielist_theme') || 'dark'
   };
 
@@ -267,10 +269,15 @@
   function initTheme() {
     document.documentElement.setAttribute('data-theme', state.theme);
     const themeIcon = document.getElementById('themeIcon');
+    const dockThemeIcon = document.getElementById('dockThemeIcon');
+    const iconName = state.theme === 'light' ? 'moon' : 'sun';
     if (themeIcon) {
-      themeIcon.setAttribute('data-lucide', state.theme === 'light' ? 'moon' : 'sun');
-      if (window.lucide) window.lucide.createIcons();
+      themeIcon.setAttribute('data-lucide', iconName);
     }
+    if (dockThemeIcon) {
+      dockThemeIcon.setAttribute('data-lucide', iconName);
+    }
+    if (window.lucide) window.lucide.createIcons();
   }
 
   function toggleTheme() {
@@ -293,48 +300,107 @@
     }
   }
 
+  // Category Multi-Row Configuration (CineBox Classical Layout)
+  const CATEGORY_ROWS_CONFIG = [
+    { key: "Today's Updates", name: "Today's Updates", altKey: "Today" },
+    { key: "Top Rated", name: "IMDb Top 250", altKey: "Top Rated" },
+    { key: "Hollywood 1080p", name: "Hollywood 1080p", altKey: "Hollywood" },
+    { key: "Bollywood", name: "Bollywood (Hindi)", altKey: "Bollywood" },
+    { key: "South Action", name: "South Action (Hindi Dubbed)", altKey: "South Action" },
+    { key: "TV Series", name: "TV & Web Series", altKey: "TV Series" },
+    { key: "K-Drama", name: "Korean Drama", altKey: "K-Drama" },
+    { key: "Animation", name: "Animation & Anime", altKey: "Animation" },
+    { key: "Bangla", name: "Bangla Cinema", altKey: "Bangla" }
+  ];
+
+  const CATEGORY_JSON_MAP = {
+    "Today's Updates": './data/today.json',
+    "Today": './data/today.json',
+    "Top Rated": './data/top_rated.json',
+    "Hollywood 1080p": './data/hollywood.json',
+    "Bollywood": './data/bollywood.json',
+    "South Action": './data/south_action.json',
+    "South Original": './data/south_original.json',
+    "TV Series": './data/tv_series.json',
+    "K-Drama": './data/kdrama.json',
+    "Animation": './data/animation.json',
+    "Bangla": './data/bangla.json'
+  };
+
+  const loadedCategories = new Set();
+  const seenCatalogUrls = new Set();
+
+  function mapItem(item, fallbackCategory) {
+    const rawTitle = item[0] || '';
+    const posterUrl = item[1] || '';
+    const videoUrl = item[2] || '';
+    const category = item[3] || fallbackCategory || 'Movies';
+    const tag = item[4] || '';
+    const size = item[5] || '';
+    const date = item[6] || '';
+
+    const { title, year, quality } = cleanTitle(rawTitle);
+
+    let rating = '8.2';
+    if (/top rated|top-250/i.test(category) || /top rated/i.test(tag)) rating = '8.9';
+    else if (/animation/i.test(category)) rating = '8.4';
+    else if (/hollywood/i.test(category)) rating = '8.1';
+    else if (/k-drama/i.test(category)) rating = '8.5';
+
+    return {
+      id: videoUrl || rawTitle,
+      rawTitle,
+      title,
+      year,
+      quality,
+      rating,
+      posterUrl,
+      videoUrl,
+      category,
+      tag,
+      size,
+      date
+    };
+  }
+
+  async function ensureCategoryLoaded(catKey) {
+    if (!catKey || catKey === 'All' || catKey === 'Watchlist' || loadedCategories.has(catKey)) return;
+    const file = CATEGORY_JSON_MAP[catKey];
+    if (!file) return;
+
+    try {
+      const res = await fetch(file + '?v=' + Date.now());
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        loadedCategories.add(catKey);
+        const mapped = data.map((item) => mapItem(item, catKey));
+        state.categories[catKey] = mapped;
+
+        mapped.forEach((m) => {
+          if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
+            seenCatalogUrls.add(m.videoUrl);
+            state.allMovies.push(m);
+          }
+        });
+
+        if (state.activeCategory === catKey) {
+          filterAndRenderGrid();
+        }
+      }
+    } catch (e) {
+      console.warn('Background category load error for', catKey, e);
+    }
+  }
+
   function processCatalogData(data) {
     const all = [];
-    const seenUrls = new Set();
-
-    function mapItem(item, fallbackCategory) {
-      const rawTitle = item[0] || '';
-      const posterUrl = item[1] || '';
-      const videoUrl = item[2] || '';
-      const category = item[3] || fallbackCategory || 'Movies';
-      const tag = item[4] || '';
-      const size = item[5] || '';
-      const date = item[6] || '';
-
-      const { title, year, quality } = cleanTitle(rawTitle);
-
-      let rating = '8.2';
-      if (/top rated|top-250/i.test(category) || /top rated/i.test(tag)) rating = '8.9';
-      else if (/animation/i.test(category)) rating = '8.4';
-      else if (/hollywood/i.test(category)) rating = '8.1';
-      else if (/k-drama/i.test(category)) rating = '8.5';
-
-      return {
-        id: videoUrl || rawTitle,
-        rawTitle,
-        title,
-        year,
-        quality,
-        rating,
-        posterUrl,
-        videoUrl,
-        category,
-        tag,
-        size,
-        date
-      };
-    }
 
     if (Array.isArray(data.carousel)) {
       state.carouselMovies = data.carousel.map((item) => mapItem(item, 'Featured'));
       state.carouselMovies.forEach((m) => {
-        if (m.videoUrl && !seenUrls.has(m.videoUrl)) {
-          seenUrls.add(m.videoUrl);
+        if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
+          seenCatalogUrls.add(m.videoUrl);
           all.push(m);
         }
       });
@@ -347,8 +413,8 @@
           const mapped = items.map((item) => mapItem(item, catName));
           state.categories[catName] = mapped;
           mapped.forEach((m) => {
-            if (m.videoUrl && !seenUrls.has(m.videoUrl)) {
-              seenUrls.add(m.videoUrl);
+            if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
+              seenCatalogUrls.add(m.videoUrl);
               all.push(m);
             }
           });
@@ -491,6 +557,22 @@
     state.slideInterval = setInterval(nextSlide, 6500);
   }
 
+  // Mobile Dock & Navigation Helpers
+  function scrollToCategories() {
+    const el = document.getElementById('categoryPillsRow');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function focusSearch() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const input = document.getElementById('searchInput');
+    if (input) {
+      setTimeout(() => input.focus(), 250);
+    }
+  }
+
   // Filtering, Searching & Sorting
   function setCategory(cat) {
     state.activeCategory = cat;
@@ -500,6 +582,22 @@
     document.querySelectorAll('.nav-link').forEach((link) => {
       link.classList.toggle('active', link.dataset.category === cat);
     });
+
+    // Update Mobile Bottom Dock Active State
+    const dockHome = document.getElementById('dockBtnHome');
+    const dockCategories = document.getElementById('dockBtnCategories');
+    const dockWatchlist = document.getElementById('dockBtnWatchlist');
+
+    if (dockHome) dockHome.classList.toggle('active', cat === 'All');
+    if (dockWatchlist) dockWatchlist.classList.toggle('active', cat === 'Watchlist');
+    if (dockCategories) dockCategories.classList.toggle('active', cat !== 'All' && cat !== 'Watchlist');
+
+    if (cat === 'All') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      ensureCategoryLoaded(cat);
+    }
+
     filterAndRenderGrid();
   }
 
@@ -513,11 +611,146 @@
     filterAndRenderGrid();
   }
 
+  // Shared Movie Card HTML Generator
+  function renderMovieCardHtml(m) {
+    const isWatchlisted = state.watchlist.has(m.videoUrl);
+    return `
+      <div class="movie-card" onclick="window.MovieList.openDetails('${escapeQuotes(m.id)}')">
+        <div class="card-poster-wrap">
+          <span class="card-badge-top-left">${escapeHtml(m.quality)}</span>
+          <div class="card-actions-top-right">
+            <button class="card-icon-action card-ext-btn" 
+                    onclick="window.MovieList.onCardExtClick('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
+                    title="Play in External App (VLC / MX Player)" 
+                    aria-label="Play in External App">
+              <i data-lucide="tv" style="width:14px;height:14px;"></i>
+            </button>
+            <button class="card-icon-action card-watchlist-btn ${isWatchlisted ? 'active' : ''}" 
+                    onclick="window.MovieList.toggleWatchlist('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
+                    title="Save to Watchlist"
+                    aria-label="Save to Watchlist">
+              <i data-lucide="bookmark" style="width:14px;height:14px;${isWatchlisted ? 'fill:currentColor;' : ''}"></i>
+            </button>
+          </div>
+          <img class="card-poster-img" src="${sanitizeUrl(m.posterUrl)}" alt="${escapeQuotes(m.title)}" loading="lazy" onerror="this.src='icons/icon-512.png'">
+          <div class="card-play-overlay">
+            <div class="card-play-icon">
+              <i data-lucide="play" style="width:20px;height:20px;fill:currentColor;"></i>
+            </div>
+          </div>
+        </div>
+        <div class="card-info">
+          <h4 class="card-title" title="${escapeQuotes(m.title)}">${escapeHtml(m.title)}</h4>
+          <div class="card-meta-row">
+            <div class="card-meta-left">
+              <span class="card-category-tag">${escapeHtml(m.category)}</span>
+              ${m.year ? `<span>• ${escapeHtml(m.year)}</span>` : ''}
+            </div>
+            <span style="display:inline-flex;align-items:center;gap:3px;font-weight:700;color:var(--accent-gold);">
+              <i data-lucide="star" style="width:12px;height:12px;fill:var(--accent-gold);"></i>
+              ${escapeHtml(m.rating)}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // "Show All" Card at End of Category Row
+  function renderShowAllCardHtml(catKey, catName, count) {
+    return `
+      <div class="movie-card show-all-card" onclick="window.MovieList.setCategory('${escapeQuotes(catKey)}')">
+        <div class="show-all-card-inner">
+          <div class="show-all-glow-orb"></div>
+          <div class="show-all-icon-circle">
+            <i data-lucide="arrow-right" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="show-all-card-title">Show All</div>
+          <div class="show-all-card-cat">${escapeHtml(catName)}</div>
+          ${count && count > 0 ? `<div class="show-all-count">${count.toLocaleString()} Titles</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // Render Horizontal Category Sliders ("Old Type Category")
+  function renderCategoryRows() {
+    const container = document.getElementById('categoryRowsContainer');
+    if (!container) return;
+
+    let html = '';
+    CATEGORY_ROWS_CONFIG.forEach((catConfig, catIdx) => {
+      const items = state.categories[catConfig.key] || state.categories[catConfig.altKey] || [];
+      if (!items || items.length === 0) return;
+
+      const sliderId = `rowSlider_${catIdx}`;
+      const rowCardsHtml = items.map((m) => renderMovieCardHtml(m)).join('');
+      const showAllHtml = renderShowAllCardHtml(catConfig.key, catConfig.name, items.length);
+
+      html += `
+        <div class="category-row-block">
+          <div class="row-header">
+            <div class="row-title-wrap" onclick="window.MovieList.setCategory('${escapeQuotes(catConfig.key)}')">
+              <h2 class="row-heading">${escapeHtml(catConfig.name)}</h2>
+              <span class="row-badge">${items.length} Titles</span>
+            </div>
+            <div class="row-controls">
+              <button class="row-nav-btn prev" onclick="window.MovieList.slideRow('${sliderId}', -1)" aria-label="Previous">
+                <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
+              </button>
+              <button class="row-nav-btn next" onclick="window.MovieList.slideRow('${sliderId}', 1)" aria-label="Next">
+                <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+          </div>
+          <div class="row-slider" id="${sliderId}">
+            ${rowCardsHtml}
+            ${showAllHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons({ root: container });
+  }
+
+  function slideRow(sliderId, direction) {
+    const el = document.getElementById(sliderId);
+    if (el) {
+      const scrollAmount = Math.max(280, el.clientWidth * 0.75);
+      el.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+    }
+  }
+
   function filterAndRenderGrid() {
+    const categoryRowsContainer = document.getElementById('categoryRowsContainer');
+    const catalogHeaderRow = document.getElementById('catalogHeaderRow');
+    const moviesGrid = document.getElementById('moviesGrid');
+    const catalogTitleText = document.getElementById('catalogSectionTitleText');
+
+    const isHomeView = state.activeCategory === 'All' && !state.searchQuery;
+
+    if (isHomeView) {
+      if (categoryRowsContainer) {
+        categoryRowsContainer.style.display = 'flex';
+        renderCategoryRows();
+      }
+      if (catalogHeaderRow) catalogHeaderRow.style.display = 'none';
+      if (moviesGrid) moviesGrid.style.display = 'none';
+      return;
+    }
+
+    // Grid mode for Specific Category / Watchlist / Search
+    if (categoryRowsContainer) categoryRowsContainer.style.display = 'none';
+    if (catalogHeaderRow) catalogHeaderRow.style.display = 'flex';
+    if (moviesGrid) moviesGrid.style.display = 'grid';
+
     let list = [...state.allMovies];
 
     if (state.activeCategory === 'Watchlist') {
       list = list.filter((m) => state.watchlist.has(m.videoUrl));
+      if (catalogTitleText) catalogTitleText.textContent = 'Saved Watchlist';
     } else if (state.activeCategory !== 'All') {
       if (state.categories[state.activeCategory]) {
         list = state.categories[state.activeCategory];
@@ -525,6 +758,9 @@
         const catQuery = state.activeCategory.toLowerCase();
         list = list.filter((m) => m.category.toLowerCase().includes(catQuery));
       }
+      if (catalogTitleText) catalogTitleText.textContent = state.activeCategory;
+    } else {
+      if (catalogTitleText) catalogTitleText.textContent = 'Search Results';
     }
 
     if (state.searchQuery) {
@@ -536,6 +772,7 @@
           m.category.toLowerCase().includes(q)
         );
       });
+      if (catalogTitleText) catalogTitleText.textContent = `Search: "${state.searchQuery}"`;
     }
 
     if (state.sortBy === 'rating') {
@@ -575,43 +812,7 @@
       return;
     }
 
-    grid.innerHTML = state.filteredMovies
-      .map((m) => {
-        const isWatchlisted = state.watchlist.has(m.videoUrl);
-        return `
-          <div class="movie-card" onclick="window.MovieList.openDetails('${escapeQuotes(m.id)}')">
-            <div class="card-poster-wrap">
-              <span class="card-badge-top-left">${escapeHtml(m.quality)}</span>
-              <button class="card-watchlist-btn ${isWatchlisted ? 'active' : ''}" 
-                      onclick="window.MovieList.toggleWatchlist('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
-                      title="Save to Watchlist">
-                <i data-lucide="bookmark" style="width:16px;height:16px;${isWatchlisted ? 'fill:currentColor;' : ''}"></i>
-              </button>
-              <img class="card-poster-img" src="${sanitizeUrl(m.posterUrl)}" alt="${escapeQuotes(m.title)}" loading="lazy" onerror="this.src='icons/icon-512.png'">
-              <div class="card-play-overlay">
-                <div class="card-play-icon">
-                  <i data-lucide="play" style="width:20px;height:20px;fill:currentColor;"></i>
-                </div>
-              </div>
-            </div>
-            <div class="card-info">
-              <h4 class="card-title" title="${escapeQuotes(m.title)}">${escapeHtml(m.title)}</h4>
-              <div class="card-meta-row">
-                <div class="card-meta-left">
-                  <span class="card-category-tag">${escapeHtml(m.category)}</span>
-                  ${m.year ? `<span>• ${escapeHtml(m.year)}</span>` : ''}
-                </div>
-                <span style="display:inline-flex;align-items:center;gap:3px;font-weight:700;color:var(--accent-gold);">
-                  <i data-lucide="star" style="width:12px;height:12px;fill:var(--accent-gold);"></i>
-                  ${escapeHtml(m.rating)}
-                </span>
-              </div>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
-
+    grid.innerHTML = state.filteredMovies.map((m) => renderMovieCardHtml(m)).join('');
     if (window.lucide) window.lucide.createIcons({ root: grid });
   }
 
@@ -662,15 +863,15 @@
       };
     }
 
-    // Configure External Player Buttons
+    // Configure External Player Buttons inside details
     const btnVlc = document.getElementById('extBtnVlc');
-    if (btnVlc) btnVlc.onclick = () => launchVLC(movie.videoUrl);
+    if (btnVlc) btnVlc.onclick = () => launchVLC(movie.videoUrl, movie.title);
 
     const btnMx = document.getElementById('extBtnMx');
-    if (btnMx) btnMx.onclick = () => launchMX(movie.videoUrl);
+    if (btnMx) btnMx.onclick = () => launchMX(movie.videoUrl, movie.title);
 
     const btnPot = document.getElementById('extBtnPot');
-    if (btnPot) btnPot.onclick = () => launchPotPlayer(movie.videoUrl);
+    if (btnPot) btnPot.onclick = () => launchPotPlayer(movie.videoUrl, movie.title);
 
     const btnCopy = document.getElementById('extBtnCopy');
     if (btnCopy) btnCopy.onclick = () => copyStreamLink(movie.videoUrl);
@@ -698,10 +899,20 @@
     }
   }
 
-  // External Player Launchers
-  function launchVLC(url) {
+  // External Player Engine (VLC, MX Player, PotPlayer, M3U Download)
+  function getCleanVideoTitle(title) {
+    return cleanTitle(title).title || 'Movie';
+  }
+
+  function launchVLC(url, title) {
     if (!url) return;
-    window.location.href = `vlc://${url}`;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const clean = encodeURIComponent(getCleanVideoTitle(title));
+      window.location.href = `intent:${url}#Intent;package=org.videolan.vlc;type=video/*;S.title=${clean};end`;
+    } else {
+      window.location.href = `vlc://${url}`;
+    }
     showToast('Dispatching stream to VLC Player...');
   }
 
@@ -718,13 +929,154 @@
     showToast('Dispatching stream to PotPlayer...');
   }
 
+  function downloadM3u(url, title) {
+    if (!url) return;
+    const name = getCleanVideoTitle(title);
+    const content = `#EXTM3U\n#EXTINF:-1,${name}\n${url}\n`;
+    const blob = new Blob([content], { type: 'application/x-mpegurl' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${name.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'movie'}.m3u`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    showToast('Downloaded M3U Playlist file');
+  }
+
   function copyStreamLink(url) {
     if (!url) return;
-    navigator.clipboard.writeText(url).then(() => {
-      showToast('Direct stream link copied to clipboard!');
-    }).catch(() => {
-      showToast('Copied: ' + url);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Direct stream link copied to clipboard!');
+      }).catch(() => {
+        showToast('Stream link: ' + url);
+      });
+    } else {
+      showToast('Stream link: ' + url);
+    }
+  }
+
+  function openExternalPlayerModal(url, title, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    state.extSelectedUrl = url || '';
+    state.extSelectedTitle = title || 'Movie';
+
+    const modal = document.getElementById('externalPlayersModal');
+    const titleEl = document.getElementById('extModalMovieTitle');
+    const chkDefault = document.getElementById('chkSetDefaultPlayer');
+    const btnClear = document.getElementById('btnClearDefaultPlayer');
+
+    if (titleEl) {
+      titleEl.textContent = title ? `${title} (HD Stream)` : 'Choose preferred media player';
+    }
+
+    if (chkDefault) {
+      chkDefault.checked = Boolean(state.defaultPlayer);
+    }
+
+    if (btnClear) {
+      btnClear.style.display = state.defaultPlayer ? 'inline-block' : 'none';
+    }
+
+    // Update Default badges
+    ['vlc', 'mx', 'pot'].forEach((p) => {
+      const badge = document.getElementById(`badgeDefault${p.charAt(0).toUpperCase() + p.slice(1)}`);
+      if (badge) {
+        badge.style.display = state.defaultPlayer === p ? 'inline-block' : 'none';
+      }
     });
+
+    if (modal) {
+      modal.classList.add('active');
+      if (window.lucide) window.lucide.createIcons({ root: modal });
+    }
+  }
+
+  function closeExternalPlayerModal() {
+    const modal = document.getElementById('externalPlayersModal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  function onCardExtClick(url, title, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (state.defaultPlayer) {
+      const playerLabels = { vlc: 'VLC Player', mx: 'MX Player', pot: 'PotPlayer' };
+      const label = playerLabels[state.defaultPlayer] || state.defaultPlayer.toUpperCase();
+      showToast(`Launching in ${label}... (Open details to change)`);
+      launchSelectedExternal(state.defaultPlayer, url, title);
+    } else {
+      openExternalPlayerModal(url, title);
+    }
+  }
+
+  function launchSelectedExternal(playerType, overrideUrl, overrideTitle) {
+    const url = overrideUrl || state.extSelectedUrl;
+    const title = overrideTitle || state.extSelectedTitle;
+    if (!url) return;
+
+    const chkDefault = document.getElementById('chkSetDefaultPlayer');
+    if (chkDefault && chkDefault.checked && playerType !== 'm3u' && playerType !== 'copy') {
+      state.defaultPlayer = playerType;
+      localStorage.setItem('movielist_default_player', playerType);
+    }
+
+    closeExternalPlayerModal();
+
+    if (playerType === 'vlc') {
+      launchVLC(url, title);
+    } else if (playerType === 'mx') {
+      launchMX(url, title);
+    } else if (playerType === 'pot') {
+      launchPotPlayer(url, title);
+    } else if (playerType === 'm3u') {
+      downloadM3u(url, title);
+    } else if (playerType === 'copy') {
+      copyStreamLink(url);
+    }
+  }
+
+  function clearDefaultPlayer() {
+    state.defaultPlayer = '';
+    localStorage.removeItem('movielist_default_player');
+    const chkDefault = document.getElementById('chkSetDefaultPlayer');
+    if (chkDefault) chkDefault.checked = false;
+    const btnClear = document.getElementById('btnClearDefaultPlayer');
+    if (btnClear) btnClear.style.display = 'none';
+
+    ['vlc', 'mx', 'pot'].forEach((p) => {
+      const badge = document.getElementById(`badgeDefault${p.charAt(0).toUpperCase() + p.slice(1)}`);
+      if (badge) badge.style.display = 'none';
+    });
+
+    showToast('Reset default external player');
+  }
+
+  function onDefaultToggle(checked) {
+    if (!checked) {
+      clearDefaultPlayer();
+    }
+  }
+
+  function openExternalFromDetails() {
+    if (!state.activeMovie) return;
+    openExternalPlayerModal(state.activeMovie.videoUrl, state.activeMovie.title);
+  }
+
+  function openExternalFromPlayer() {
+    const video = document.getElementById('cinemaVideo');
+    if (video) video.pause();
+    const titleEl = document.getElementById('playerTitle');
+    const title = titleEl ? titleEl.textContent : 'Playing Media';
+    const url = video ? video.src : '';
+    openExternalPlayerModal(url, title);
   }
 
   // Trailer Preview Modal
@@ -887,7 +1239,10 @@
       const video = document.getElementById('cinemaVideo');
 
       if (e.key === 'Escape') {
-        if (trailerModal && trailerModal.classList.contains('active')) {
+        const extModal = document.getElementById('externalPlayersModal');
+        if (extModal && extModal.classList.contains('active')) {
+          closeExternalPlayerModal();
+        } else if (trailerModal && trailerModal.classList.contains('active')) {
           closeTrailer();
         } else if (playerModal && playerModal.classList.contains('active')) {
           closePlayer();
@@ -957,6 +1312,13 @@
       });
     }
 
+    const extModal = document.getElementById('externalPlayersModal');
+    if (extModal) {
+      extModal.addEventListener('click', (e) => {
+        if (e.target === extModal) closeExternalPlayerModal();
+      });
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -970,6 +1332,7 @@
       showSlide(idx);
       startCarouselAuto();
     },
+    slideRow,
     toggleWatchlist,
     removeHistory,
     openDetails,
@@ -983,7 +1346,18 @@
     launchVLC,
     launchMX,
     launchPotPlayer,
+    downloadM3u,
     copyStreamLink,
+    openExternalPlayerModal,
+    closeExternalPlayerModal,
+    onCardExtClick,
+    launchSelectedExternal,
+    clearDefaultPlayer,
+    onDefaultToggle,
+    openExternalFromDetails,
+    openExternalFromPlayer,
+    scrollToCategories,
+    focusSearch,
     toggleTheme
   };
 

@@ -117,33 +117,46 @@
       </div>
     </section>
 
-    <!-- Catalog Section Title -->
-    <div class="catalog-header-row">
-      <h3 class="catalog-section-title">
-        <span>Explore Library</span>
-        <span id="catalogCountBadge" class="catalog-section-badge">Loading...</span>
-      </h3>
+    <!-- Old Type Multi-Row Category Sliders (Default Home View) -->
+    <section class="category-rows-container" id="categoryRowsContainer" aria-label="Category Sliders"></section>
+
+    <!-- Catalog Section Header (Visible in Grid / Search / Specific Category View) -->
+    <div class="catalog-header-row" id="catalogHeaderRow" style="display: none;">
+      <div class="catalog-header-left">
+        <button class="btn-back-to-all" id="btnBackToAll" onclick="window.MovieList.setCategory('All')" title="Back to All Categories">
+          <i data-lucide="arrow-left" style="width:16px;height:16px;"></i>
+          <span>All Categories</span>
+        </button>
+        <h3 class="catalog-section-title">
+          <span id="catalogSectionTitleText">Explore Library</span>
+          <span id="catalogCountBadge" class="catalog-section-badge">0 Titles</span>
+        </h3>
+      </div>
     </div>
 
-    <!-- Movie Grid -->
-    <main class="movies-grid-container" id="moviesGrid"></main>
+    <!-- Movie Grid (Visible in Grid / Search / Category View) -->
+    <main class="movies-grid-container" id="moviesGrid" style="display: none;"></main>
 
     <!-- Mobile Floating Bottom Dock -->
     <nav class="mobile-bottom-dock" aria-label="Mobile Dock Navigation">
-      <button class="mobile-dock-btn active" onclick="window.MovieList.setCategory('All')">
+      <button class="mobile-dock-btn active" id="dockBtnHome" onclick="window.MovieList.setCategory('All')">
         <i data-lucide="home" style="width:20px;height:20px;"></i>
         <span>Home</span>
       </button>
-      <button class="mobile-dock-btn" onclick="document.getElementById('searchInput').focus()">
+      <button class="mobile-dock-btn" id="dockBtnCategories" onclick="window.MovieList.scrollToCategories()">
+        <i data-lucide="layers" style="width:20px;height:20px;"></i>
+        <span>Categories</span>
+      </button>
+      <button class="mobile-dock-btn" id="dockBtnSearch" onclick="window.MovieList.focusSearch()">
         <i data-lucide="search" style="width:20px;height:20px;"></i>
         <span>Search</span>
       </button>
-      <button class="mobile-dock-btn" onclick="window.MovieList.setCategory('Watchlist')">
+      <button class="mobile-dock-btn" id="dockBtnWatchlist" onclick="window.MovieList.setCategory('Watchlist')">
         <i data-lucide="bookmark" style="width:20px;height:20px;"></i>
         <span>Watchlist</span>
       </button>
-      <button class="mobile-dock-btn" onclick="window.MovieList.toggleTheme()">
-        <i data-lucide="moon" style="width:20px;height:20px;"></i>
+      <button class="mobile-dock-btn" id="dockBtnTheme" onclick="window.MovieList.toggleTheme()">
+        <i id="dockThemeIcon" data-lucide="sun" style="width:20px;height:20px;"></i>
         <span>Theme</span>
       </button>
     </nav>
@@ -201,6 +214,10 @@
             <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
             Play Movie
           </button>
+          <button class="btn-glass" id="modalExtPlayerBtn" onclick="window.MovieList.openExternalFromDetails()">
+            <i data-lucide="tv" style="width:16px;height:16px;"></i>
+            External App
+          </button>
           <button class="btn-glass" id="modalTrailerBtn">
             <i data-lucide="film" style="width:16px;height:16px;"></i>
             Watch Trailer
@@ -237,6 +254,101 @@
     </div>
   </div>
 
+  <!-- Dedicated External Player Selection Modal -->
+  <div class="modal-overlay" id="externalPlayersModal" role="dialog" aria-modal="true" aria-labelledby="extModalMovieTitle">
+    <div class="ext-modal-card">
+      <button class="modal-close-btn" onclick="window.MovieList.closeExternalPlayerModal()" aria-label="Close external players modal">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+      </button>
+
+      <div class="ext-modal-header">
+        <div class="ext-modal-icon-badge">
+          <i data-lucide="tv" style="width:22px;height:22px;color:var(--primary);"></i>
+        </div>
+        <div class="ext-modal-title-group">
+          <h3 class="ext-modal-title">Play in External App</h3>
+          <p class="ext-modal-subtitle" id="extModalMovieTitle">Choose preferred media player</p>
+        </div>
+      </div>
+
+      <div class="ext-player-options-list">
+        <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('vlc')">
+          <div class="ext-option-icon vlc-icon">
+            <i data-lucide="play-circle" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="ext-option-text">
+            <span class="ext-option-name">
+              VLC Media Player
+              <span class="ext-default-badge" id="badgeDefaultVlc" style="display: none;">Default</span>
+            </span>
+            <span class="ext-option-desc">Universal player for Android, iOS, Windows, and Mac</span>
+          </div>
+          <i data-lucide="chevron-right" class="ext-option-chevron"></i>
+        </button>
+
+        <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('mx')">
+          <div class="ext-option-icon mx-icon">
+            <i data-lucide="smartphone" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="ext-option-text">
+            <span class="ext-option-name">
+              MX Player
+              <span class="ext-default-badge" id="badgeDefaultMx" style="display: none;">Default</span>
+            </span>
+            <span class="ext-option-desc">Hardware acceleration for Android smartphones and tablets</span>
+          </div>
+          <i data-lucide="chevron-right" class="ext-option-chevron"></i>
+        </button>
+
+        <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('pot')">
+          <div class="ext-option-icon pot-icon">
+            <i data-lucide="monitor" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="ext-option-text">
+            <span class="ext-option-name">
+              PotPlayer
+              <span class="ext-default-badge" id="badgeDefaultPot" style="display: none;">Default</span>
+            </span>
+            <span class="ext-option-desc">High-performance 64-bit playback for Windows PC</span>
+          </div>
+          <i data-lucide="chevron-right" class="ext-option-chevron"></i>
+        </button>
+
+        <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('m3u')">
+          <div class="ext-option-icon m3u-icon">
+            <i data-lucide="download" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="ext-option-text">
+            <span class="ext-option-name">Download M3U Playlist</span>
+            <span class="ext-option-desc">Open stream in KMPlayer, Kodi, or Apple QuickTime</span>
+          </div>
+          <i data-lucide="chevron-right" class="ext-option-chevron"></i>
+        </button>
+
+        <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('copy')">
+          <div class="ext-option-icon copy-icon">
+            <i data-lucide="copy" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="ext-option-text">
+            <span class="ext-option-name">Copy Direct Stream Link</span>
+            <span class="ext-option-desc">Copy video URL to clipboard for custom network streams</span>
+          </div>
+          <i data-lucide="chevron-right" class="ext-option-chevron"></i>
+        </button>
+      </div>
+
+      <div class="ext-modal-footer">
+        <label class="ext-default-toggle">
+          <input type="checkbox" id="chkSetDefaultPlayer" onchange="window.MovieList.onDefaultToggle(this.checked)">
+          <span>Remember selected player as default</span>
+        </label>
+        <button class="btn-clear-default" id="btnClearDefaultPlayer" style="display: none;" onclick="window.MovieList.clearDefaultPlayer()">
+          Reset Default
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Built-In Video Player Modal with Dynamic Ambilight -->
   <div class="player-modal-overlay" id="playerModal" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
     <div class="player-cinema-box">
@@ -249,6 +361,10 @@
           <span class="player-media-title" id="playerTitle">Playing Media</span>
         </div>
         <div class="player-controls-top-right">
+          <button class="player-pill-btn" onclick="window.MovieList.openExternalFromPlayer()" title="Play in External App (VLC / MX)">
+            <i data-lucide="tv" style="width:14px;height:14px;"></i>
+            <span>External App</span>
+          </button>
           <select class="player-speed-select" onchange="window.MovieList.setPlaybackSpeed(this.value)" title="Playback Speed">
             <option value="0.75">0.75x</option>
             <option value="1" selected>1.0x (Normal)</option>
