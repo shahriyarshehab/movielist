@@ -1489,8 +1489,10 @@
     const qualityBadge = document.getElementById('posterQualityBadge');
     if (qualityBadge) qualityBadge.textContent = movie.quality || 'HD';
 
-    // Cinematic Hero Elements
+    // Cinematic Hero & Ambient Backdrop Elements
     document.getElementById('modalBackdropImg').src = sanitizeUrl(movie.posterUrl);
+    const ambientBg = document.getElementById('modalAmbientBg');
+    if (ambientBg) ambientBg.src = sanitizeUrl(movie.posterUrl);
     document.getElementById('modalPosterImg').src = sanitizeUrl(movie.posterUrl);
     document.getElementById('modalMovieTitle').textContent = movie.title;
     document.getElementById('modalQualityTag').textContent = movie.quality;
@@ -2061,6 +2063,10 @@
         const bgImg = document.getElementById('modalBackdropImg');
         if (bgImg) {
           bgImg.src = sanitizeUrl(meta.backdrop);
+        }
+        const ambBg = document.getElementById('modalAmbientBg');
+        if (ambBg) {
+          ambBg.src = sanitizeUrl(meta.backdrop);
         }
       }
     } catch (e) {
