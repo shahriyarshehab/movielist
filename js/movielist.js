@@ -24,7 +24,18 @@
     extSelectedUrl: '',
     extSelectedTitle: '',
     defaultPlayer: localStorage.getItem('movielist_default_player') || '',
-    theme: localStorage.getItem('movielist_theme') || 'dark'
+    isVlcDesktopAuto:
+      localStorage.getItem('movielist_vlc_desktop') === 'true' ||
+      localStorage.getItem('movielist_default_player') === 'vlc',
+    theme: localStorage.getItem('movielist_theme') || 'dark',
+    allCatalogLoaded: false,
+    tvCatalog: null,
+    currentTvEntry: null,
+    currentSeasonEpisodes: [],
+    currentSeasonName: '',
+    currentSelectedSeasonIdx: 0,
+    currentPlayingEpisodeIdx: -1,
+    episodeFilterQuery: ''
   };
 
   // Safe DOM Sanitizers
@@ -287,19 +298,6 @@
     showToast(`Switched to ${state.theme === 'dark' ? 'Dark' : 'Light'} Mode`);
   }
 
-  // Data Hydration from home_data.json
-  async function loadCatalog() {
-    try {
-      const res = await fetch('./home_data.json?v=' + Date.now());
-      if (!res.ok) throw new Error('Failed to load catalog');
-      const data = await res.json();
-      processCatalogData(data);
-    } catch (err) {
-      console.error('Catalog load error, using fallback:', err);
-      processFallbackData();
-    }
-  }
-
   // Category Multi-Row Configuration (CineBox Classical Layout)
   const CATEGORY_ROWS_CONFIG = [
     { key: "Today's Updates", name: "Today's Updates", altKey: "Today" },
@@ -327,6 +325,18 @@
     "Bangla": './data/bangla.json'
   };
 
+  const SEPARATED_CATEGORIES = [
+    { key: "Today's Updates", file: './data/categories/today.json' },
+    { key: "Top Rated", file: './data/categories/top_rated.json' },
+    { key: "Hollywood 1080p", file: './data/categories/hollywood.json' },
+    { key: "Bollywood", file: './data/categories/bollywood.json' },
+    { key: "South Action", file: './data/categories/south_action.json' },
+    { key: "TV Series", file: './data/categories/tv_series.json' },
+    { key: "K-Drama", file: './data/categories/kdrama.json' },
+    { key: "Animation", file: './data/categories/animation.json' },
+    { key: "Bangla", file: './data/categories/bangla.json' }
+  ];
+
   const loadedCategories = new Set();
   const seenCatalogUrls = new Set();
 
@@ -346,6 +356,8 @@
     else if (/animation/i.test(category)) rating = '8.4';
     else if (/hollywood/i.test(category)) rating = '8.1';
     else if (/k-drama/i.test(category)) rating = '8.5';
+    else if (/game of thrones/i.test(rawTitle)) rating = '9.2';
+    else if (/breaking bad/i.test(rawTitle)) rating = '9.5';
 
     return {
       id: videoUrl || rawTitle,
@@ -361,6 +373,123 @@
       size,
       date
     };
+  }
+
+  // Ultra-Fast Parallel Separated Category Loader for Instant Home Render
+  async function loadSeparatedCategories() {
+    let loadedAny = false;
+    await Promise.allSettled(
+      SEPARATED_CATEGORIES.map(async ({ key, file }) => {
+        try {
+          const res = await fetch(file + '?v=' + Date.now());
+          if (!res.ok) return;
+          const items = await res.json();
+          if (Array.isArray(items) && items.length > 0) {
+            const mapped = items.map((item) => mapItem(item, key));
+            state.categories[key] = mapped;
+            mapped.forEach((m) => {
+              if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
+                seenCatalogUrls.add(m.videoUrl);
+                state.allMovies.push(m);
+              }
+            });
+            loadedAny = true;
+          }
+        } catch (e) {
+          // ignore individual category error
+        }
+      })
+    );
+
+    if (loadedAny) {
+      if (!state.carouselMovies.length) {
+        const heroPool =
+          state.categories["Today's Updates"] ||
+          state.categories['Top Rated'] ||
+          state.categories['TV Series'] ||
+          state.allMovies;
+        state.carouselMovies = heroPool.slice(0, 6);
+        renderHeroCarousel();
+      }
+      filterAndRenderGrid();
+      loadHistory();
+    }
+    return loadedAny;
+  }
+
+  // Full Library Background Loader (Includes all TV Series like Game of Thrones & all movies)
+  let fullLibraryLoadingPromise = null;
+  function loadFullLibraryInBackground() {
+    if (state.allCatalogLoaded || fullLibraryLoadingPromise) {
+      return fullLibraryLoadingPromise || Promise.resolve();
+    }
+
+    fullLibraryLoadingPromise = (async () => {
+      const allFiles = [
+        { key: 'TV Series', file: './data/tv_series.json' },
+        { key: 'Top Rated', file: './data/top_rated.json' },
+        { key: 'Hollywood 1080p', file: './data/hollywood.json' },
+        { key: 'Bollywood', file: './data/bollywood.json' },
+        { key: 'K-Drama', file: './data/kdrama.json' },
+        { key: 'Animation', file: './data/animation.json' },
+        { key: 'Bangla', file: './data/bangla.json' },
+        { key: 'South Action', file: './data/south_action.json' },
+        { key: 'South Original', file: './data/south_original.json' }
+      ];
+
+      for (const item of allFiles) {
+        try {
+          const res = await fetch(item.file + '?v=' + Date.now());
+          if (res.ok) {
+            const list = await res.json();
+            if (Array.isArray(list)) {
+              loadedCategories.add(item.key);
+              const mapped = list.map((entry) => mapItem(entry, item.key));
+              state.categories[item.key] = mapped;
+              mapped.forEach((m) => {
+                if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
+                  seenCatalogUrls.add(m.videoUrl);
+                  state.allMovies.push(m);
+                }
+              });
+              if (state.searchQuery || state.activeCategory === item.key) {
+                filterAndRenderGrid();
+              }
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      state.allCatalogLoaded = true;
+    })();
+
+    return fullLibraryLoadingPromise;
+  }
+
+  // Data Hydration from Separated JSONs and Background Catalogs
+  async function loadCatalog() {
+    const separatedSuccess = await loadSeparatedCategories();
+
+    try {
+      const res = await fetch('./home_data.json?v=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        processCatalogData(data);
+      } else if (!separatedSuccess) {
+        processFallbackData();
+      }
+    } catch (err) {
+      if (!separatedSuccess) {
+        console.error('Catalog load error, using fallback:', err);
+        processFallbackData();
+      }
+    }
+
+    // Trigger full library loading in background so search finds Game of Thrones & all movies
+    setTimeout(() => {
+      loadFullLibraryInBackground();
+    }, 120);
   }
 
   async function ensureCategoryLoaded(catKey) {
@@ -557,7 +686,46 @@
     state.slideInterval = setInterval(nextSlide, 6500);
   }
 
-  // Mobile Dock & Navigation Helpers
+  // Mobile Dock, Category Drawer & Navigation Helpers
+  function openCategoryDrawer() {
+    const drawer = document.getElementById('categoryDrawerOverlay');
+    if (drawer) {
+      drawer.classList.add('active');
+      if (window.lucide) window.lucide.createIcons({ root: drawer });
+    }
+  }
+
+  function closeCategoryDrawer() {
+    const drawer = document.getElementById('categoryDrawerOverlay');
+    if (drawer) drawer.classList.remove('active');
+  }
+
+  function selectCategoryFromDrawer(cat) {
+    closeCategoryDrawer();
+    setCategory(cat);
+  }
+
+  function toggleMobileSearch(forceState) {
+    const bar = document.getElementById('mobileSearchBar');
+    const input = document.getElementById('mobileSearchInput');
+    if (!bar) return;
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !bar.classList.contains('active');
+    bar.classList.toggle('active', shouldOpen);
+    if (shouldOpen && input) {
+      setTimeout(() => input.focus(), 150);
+    } else if (!shouldOpen && input) {
+      input.blur();
+    }
+  }
+
+  function clearMobileSearch() {
+    const mobileInput = document.getElementById('mobileSearchInput');
+    const searchInput = document.getElementById('searchInput');
+    if (mobileInput) mobileInput.value = '';
+    if (searchInput) searchInput.value = '';
+    setSearch('');
+  }
+
   function scrollToCategories() {
     const el = document.getElementById('categoryPillsRow');
     if (el) {
@@ -566,10 +734,15 @@
   }
 
   function focusSearch() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const input = document.getElementById('searchInput');
-    if (input) {
-      setTimeout(() => input.focus(), 250);
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      toggleMobileSearch(true);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const input = document.getElementById('searchInput');
+      if (input) {
+        setTimeout(() => input.focus(), 250);
+      }
     }
   }
 
@@ -603,6 +776,21 @@
 
   function setSearch(query) {
     state.searchQuery = (query || '').trim().toLowerCase();
+
+    // Ensure full library is being loaded so Game of Thrones and all titles are matched
+    if (state.searchQuery && !state.allCatalogLoaded) {
+      loadFullLibraryInBackground();
+    }
+
+    // Sync search input values
+    const mainInput = document.getElementById('searchInput');
+    const mobileInput = document.getElementById('mobileSearchInput');
+    if (mainInput && mainInput.value !== (query || '')) mainInput.value = query || '';
+    if (mobileInput && mobileInput.value !== (query || '')) mobileInput.value = query || '';
+
+    const clearBtn = document.getElementById('mobileSearchClearBtn');
+    if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+
     filterAndRenderGrid();
   }
 
@@ -817,6 +1005,7 @@
   }
 
   // Movie Details Modal Component
+  // Movie Details Modal Component
   function openDetails(id) {
     const movie = state.allMovies.find((m) => m.id === id) || state.carouselMovies.find((m) => m.id === id);
     if (!movie) return;
@@ -836,6 +1025,14 @@
     document.getElementById('modalYearStat').textContent = movie.year || '2025';
     document.getElementById('modalSizeStat').textContent = movie.size || 'HD Stream';
     document.getElementById('modalDateStat').textContent = movie.date ? movie.date.split(' ')[0] : 'Latest';
+
+    // Configure Play Button text based on Computer VLC Mode
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isVlcAuto = !isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc');
+    const modalPlayBtnText = document.getElementById('modalPlayBtnText');
+    if (modalPlayBtnText) {
+      modalPlayBtnText.textContent = isVlcAuto ? 'Open in VLC Player' : 'Play Movie';
+    }
 
     const playBtn = document.getElementById('modalPlayBtn');
     if (playBtn) {
@@ -876,6 +1073,17 @@
     const btnCopy = document.getElementById('extBtnCopy');
     if (btnCopy) btnCopy.onclick = () => copyStreamLink(movie.videoUrl);
 
+    // Check if TV Series / Episodic Media
+    if (isTvSeries(movie)) {
+      loadTvSeriesSeasons(movie.videoUrl, movie.rawTitle || movie.title);
+    } else {
+      const epSection = document.getElementById('seriesEpisodesSection');
+      if (epSection) epSection.style.display = 'none';
+      state.currentTvEntry = null;
+      state.currentSeasonEpisodes = [];
+      state.currentPlayingEpisodeIdx = -1;
+    }
+
     modal.classList.add('active');
     if (window.lucide) window.lucide.createIcons({ root: modal });
   }
@@ -883,7 +1091,10 @@
   function closeDetails() {
     const modal = document.getElementById('detailsModal');
     if (modal) modal.classList.remove('active');
+    const epSection = document.getElementById('seriesEpisodesSection');
+    if (epSection) epSection.style.display = 'none';
     state.activeMovie = null;
+    state.currentTvEntry = null;
   }
 
   function updateModalWatchlistState() {
@@ -897,6 +1108,515 @@
       `;
       if (window.lucide) window.lucide.createIcons({ root: watchBtn });
     }
+  }
+
+  // VLC Desktop Auto-Open System for PC / Computer
+  function autoOpenVlcOnComputer(url, title) {
+    if (!url) return;
+    showToast('Auto-opening in VLC Media Player on computer...');
+    try {
+      let iframe = document.getElementById('vlcDispatcherIframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'vlcDispatcherIframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+      }
+      iframe.src = `vlc://${url}`;
+    } catch (e) {
+      window.location.href = `vlc://${url}`;
+    }
+  }
+
+  function toggleVlcDesktop(forceState) {
+    if (typeof forceState === 'boolean') {
+      state.isVlcDesktopAuto = forceState;
+    } else {
+      state.isVlcDesktopAuto = !state.isVlcDesktopAuto;
+    }
+
+    if (state.isVlcDesktopAuto) {
+      state.defaultPlayer = 'vlc';
+      localStorage.setItem('movielist_default_player', 'vlc');
+      localStorage.setItem('movielist_vlc_desktop', 'true');
+      showToast('VLC Auto-Open enabled for Computer');
+    } else {
+      if (state.defaultPlayer === 'vlc') {
+        state.defaultPlayer = '';
+        localStorage.removeItem('movielist_default_player');
+      }
+      localStorage.setItem('movielist_vlc_desktop', 'false');
+      showToast('VLC Auto-Open disabled (using in-browser cinema player)');
+    }
+
+    updateDesktopVlcUi();
+  }
+
+  function updateDesktopVlcUi() {
+    const isVlc = state.isVlcDesktopAuto || state.defaultPlayer === 'vlc';
+    const toggleBtn = document.getElementById('btnDesktopVlcToggle');
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('active', isVlc);
+      const textEl = toggleBtn.querySelector('.vlc-desktop-text');
+      if (textEl) {
+        textEl.textContent = isVlc ? 'VLC: ON' : 'VLC: OFF';
+      }
+    }
+
+    const autoCard = document.getElementById('vlcComputerAutoCard');
+    const btnToggleAuto = document.getElementById('btnToggleVlcAuto');
+    if (autoCard) {
+      autoCard.classList.toggle('active', isVlc);
+    }
+    if (btnToggleAuto) {
+      btnToggleAuto.textContent = isVlc ? 'Disable Auto-Open' : 'Enable Auto-Open';
+    }
+
+    const modalPlayBtnText = document.getElementById('modalPlayBtnText');
+    if (modalPlayBtnText) {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (!isMobile && isVlc) {
+        modalPlayBtnText.textContent = 'Open in VLC Player';
+      } else {
+        modalPlayBtnText.textContent = 'Play Movie';
+      }
+    }
+  }
+
+  // TV Series Seasons & Episodes Engine
+  function isTvSeries(m) {
+    if (!m) return false;
+    const cat = (m.category || '').toLowerCase();
+    const tag = (m.tag || '').toLowerCase();
+    const title = (m.title || m.rawTitle || '').toLowerCase();
+    const url = (m.videoUrl || '').toLowerCase();
+
+    return (
+      cat.includes('tv') ||
+      cat.includes('series') ||
+      cat.includes('k-drama') ||
+      cat.includes('drama') ||
+      cat.includes('anime') ||
+      cat.includes('animation') ||
+      tag.includes('tv') ||
+      tag.includes('series') ||
+      tag.includes('k-drama') ||
+      title.includes('(tv series') ||
+      title.includes('(tv mini series') ||
+      title.includes('season') ||
+      title.includes('episode') ||
+      url.endsWith('/')
+    );
+  }
+
+  function cleanEpisodeTitle(raw) {
+    if (!raw) return 'Episode';
+    let text = String(raw).replace(/\.(mkv|mp4|avi|webm)$/i, '');
+    text = text.replace(/[._]/g, ' ');
+    const junkPatterns = [
+      /\b\d{3,4}p\b/gi,
+      /\b(bluray|bdrip|brrip|web-dl|webrip|web|hdrip|dvdrip|hdtv|hdtc|camrip)\b/gi,
+      /\b(x264|x265|hevc|h264|10bit|8bit|aac|ac3|dd5\.1|dts)\b/gi,
+      /\b(dual audio|multi audio|hindi|english|esub|msubs?)\b/gi,
+      /\[.*?\]/g,
+      /-[a-zA-Z0-9]+$/
+    ];
+    junkPatterns.forEach((p) => {
+      text = text.replace(p, ' ');
+    });
+    text = text.replace(/\s+/g, ' ').trim();
+    return text || raw;
+  }
+
+  async function loadTvSeriesSeasons(seriesUrl, seriesTitle) {
+    const section = document.getElementById('seriesEpisodesSection');
+    const tabsRow = document.getElementById('seasonTabsRow');
+    const epContainer = document.getElementById('episodeListContainer');
+    const countBadge = document.getElementById('seasonCountBadge');
+
+    if (!section) return;
+    section.style.display = 'block';
+    if (countBadge) countBadge.textContent = 'Loading seasons & episodes...';
+    if (tabsRow) tabsRow.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">Loading season directory...</div>';
+    if (epContainer) epContainer.innerHTML = '';
+
+    // Ensure tvCatalog is loaded
+    if (!state.tvCatalog) {
+      try {
+        const res = await fetch('./tv_index.json?v=' + Date.now());
+        if (res.ok) {
+          state.tvCatalog = await res.json();
+        }
+      } catch (e) {
+        console.warn('Could not load tv_index.json:', e);
+      }
+    }
+
+    const tvCatalog = state.tvCatalog || {};
+
+    let matchedData = null;
+
+    // 1. Direct title lookup
+    if (tvCatalog[seriesTitle]) {
+      matchedData = tvCatalog[seriesTitle];
+    }
+
+    // 2. Directory URL lookup
+    if (!matchedData && seriesUrl) {
+      const normTargetUrl = decodeURI(seriesUrl).replace(/\/+$/, '').toLowerCase();
+      for (const [k, v] of Object.entries(tvCatalog)) {
+        if (v && v[0]) {
+          const normEntryUrl = decodeURI(v[0]).replace(/\/+$/, '').toLowerCase();
+          if (normEntryUrl === normTargetUrl || normTargetUrl.startsWith(normEntryUrl) || normEntryUrl.startsWith(normTargetUrl)) {
+            matchedData = v;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Normalized alphanumeric title lookup (e.g. Game of Thrones)
+    if (!matchedData && seriesTitle) {
+      const normTarget = seriesTitle.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      for (const [k, v] of Object.entries(tvCatalog)) {
+        const normK = k.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (
+          normK === normTarget ||
+          (normK.length > 5 && normTarget.includes(normK)) ||
+          (normTarget.length > 5 && normK.includes(normTarget))
+        ) {
+          matchedData = v;
+          break;
+        }
+      }
+    }
+
+    if (matchedData) {
+      state.currentTvEntry = matchedData;
+      renderIndexedTvData(matchedData, seriesTitle);
+      return;
+    }
+
+    // Fallback: If not indexed, direct stream option
+    if (countBadge) countBadge.textContent = 'Single Stream Media';
+    if (tabsRow) tabsRow.innerHTML = '';
+    if (epContainer) {
+      epContainer.innerHTML = `
+        <div style="font-size:12px;color:var(--text-muted);padding:12px 4px;">
+          Direct stream is available. Click Play above to begin playback.
+        </div>
+      `;
+    }
+  }
+
+  function renderIndexedTvData(tvData, seriesTitle) {
+    const tabsRow = document.getElementById('seasonTabsRow');
+    const epContainer = document.getElementById('episodeListContainer');
+    const countBadge = document.getElementById('seasonCountBadge');
+
+    const folderUrl = tvData[0] || '';
+    const seasons = tvData[1] || [];
+    const specials = tvData[2] || [];
+
+    let totalEpisodes = 0;
+    seasons.forEach((s) => {
+      if (Array.isArray(s[2])) totalEpisodes += s[2].length;
+    });
+
+    const badgeStr = `${seasons.length} Seasons • ${totalEpisodes} Episodes ${specials.length > 0 ? `+ ${specials.length} Specials` : ''}`;
+    if (countBadge) countBadge.textContent = badgeStr;
+
+    if (seasons.length > 0) {
+      let tabsHtml = seasons
+        .map((s, idx) => {
+          const sName = s[0];
+          return `
+            <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" onclick="window.MovieList.selectIndexedSeason(${idx}, '${escapeQuotes(sName)}')">
+              ${escapeHtml(sName)}
+            </button>
+          `;
+        })
+        .join('');
+
+      if (specials.length > 0) {
+        tabsHtml += `
+          <button class="season-pill-btn specials-pill" onclick="window.MovieList.selectSpecialsTab()" style="display:inline-flex;align-items:center;gap:5px;">
+            <i data-lucide="star" style="width:12px;height:12px;fill:currentColor;"></i>
+            <span>Specials (${specials.length})</span>
+          </button>
+        `;
+      }
+
+      if (tabsRow) tabsRow.innerHTML = tabsHtml;
+      if (window.lucide) window.lucide.createIcons({ root: tabsRow });
+
+      state.currentSelectedSeasonIdx = 0;
+      loadIndexedSeasonEpisodes(0, seasons[0][0]);
+    } else {
+      if (countBadge) countBadge.textContent = 'Directory Media';
+      if (epContainer) {
+        epContainer.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px 4px;">Direct media stream available.</div>';
+      }
+    }
+  }
+
+  function selectIndexedSeason(seasonIdx, seasonName) {
+    document.querySelectorAll('.season-pill-btn').forEach((b, idx) => {
+      b.classList.toggle('active', idx === seasonIdx);
+    });
+
+    loadIndexedSeasonEpisodes(seasonIdx, seasonName);
+  }
+
+  function selectSpecialsTab() {
+    document.querySelectorAll('.season-pill-btn').forEach((b) => b.classList.remove('active'));
+    const specialsBtn = document.querySelector('.season-pill-btn.specials-pill');
+    if (specialsBtn) specialsBtn.classList.add('active');
+
+    if (!state.currentTvEntry || !state.currentTvEntry[2]) return;
+    const folderUrl = state.currentTvEntry[0] || '';
+    const specials = state.currentTvEntry[2] || [];
+
+    state.currentSeasonName = 'Specials';
+    state.currentSelectedSeasonIdx = -1;
+    state.currentPlayingEpisodeIdx = -1;
+
+    const episodes = specials.map((name) => {
+      const cleanUrl = folderUrl.endsWith('/') ? folderUrl + encodeURI(name) : folderUrl + '/' + encodeURI(name);
+      return { name, url: cleanUrl };
+    });
+
+    state.currentSeasonEpisodes = episodes;
+    renderEpisodeListHtml(episodes);
+  }
+
+  function loadIndexedSeasonEpisodes(seasonIdx, seasonName) {
+    if (!state.currentTvEntry || !state.currentTvEntry[1] || !state.currentTvEntry[1][seasonIdx]) return;
+
+    state.currentSeasonName = seasonName;
+    state.currentSelectedSeasonIdx = seasonIdx;
+    state.episodeFilterQuery = '';
+
+    const filterInput = document.getElementById('episodeFilterInput');
+    if (filterInput) filterInput.value = '';
+
+    const seasonData = state.currentTvEntry[1][seasonIdx];
+    const sUrl = seasonData[1];
+    const epNames = seasonData[2] || [];
+
+    const episodes = epNames.map((name) => {
+      const cleanUrl = sUrl.endsWith('/') ? sUrl + encodeURI(name) : sUrl + '/' + encodeURI(name);
+      return {
+        name,
+        url: cleanUrl
+      };
+    });
+
+    state.currentSeasonEpisodes = episodes;
+    renderEpisodeListHtml(episodes);
+  }
+
+  function renderEpisodeListHtml(episodes) {
+    const epContainer = document.getElementById('episodeListContainer');
+    const filterBox = document.getElementById('episodeFilterBox');
+    if (!epContainer) return;
+
+    if (!episodes || episodes.length === 0) {
+      epContainer.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:14px;text-align:center;">No episodes found in this season.</div>';
+      return;
+    }
+
+    if (filterBox) {
+      filterBox.style.display = episodes.length > 6 ? 'flex' : 'none';
+    }
+
+    const filtered = state.episodeFilterQuery
+      ? episodes.filter((e) => e.name.toLowerCase().includes(state.episodeFilterQuery))
+      : episodes;
+
+    epContainer.innerHTML = filtered
+      .map((ep) => {
+        const originalIdx = episodes.indexOf(ep);
+        const isPlaying = originalIdx === state.currentPlayingEpisodeIdx;
+        const cleanName = cleanEpisodeTitle(ep.name);
+
+        return `
+          <div class="ep-card ${isPlaying ? 'playing' : ''}" onclick="window.MovieList.playSpecificEpisode(${originalIdx})">
+            <div class="ep-left-wrap">
+              <div class="ep-index-badge">
+                ${isPlaying ? '<i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i>' : `E${(originalIdx + 1) < 10 ? '0' : ''}${originalIdx + 1}`}
+              </div>
+              <div class="ep-info-wrap">
+                <span class="ep-title-text" title="${escapeQuotes(ep.name)}">${escapeHtml(cleanName)}</span>
+                <div class="ep-meta-sub">
+                  <span style="color:${isPlaying ? 'var(--primary)' : 'var(--text-muted)'};font-weight:700;">${isPlaying ? 'NOW PLAYING' : escapeHtml(state.currentSeasonName)}</span>
+                  <span>•</span>
+                  <span>1080p HD</span>
+                </div>
+              </div>
+            </div>
+            <div class="ep-action-btns" onclick="event.stopPropagation();">
+              <button class="ep-icon-btn ep-btn-stream" onclick="window.MovieList.playSpecificEpisode(${originalIdx})" title="Stream Episode">
+                <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i>
+              </button>
+              <button class="ep-icon-btn ep-btn-ext" onclick="window.MovieList.openExternalPlayerModal('${escapeQuotes(ep.url)}', '${escapeQuotes(state.currentSeasonName + ' - ' + cleanName)}', event)" title="Play in VLC / MX Player">
+                <i data-lucide="tv" style="width:14px;height:14px;"></i>
+              </button>
+              <a class="ep-icon-btn ep-btn-download" href="${sanitizeUrl(ep.url)}" download title="Direct Download" target="_blank" rel="noopener">
+                <i data-lucide="download" style="width:14px;height:14px;"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    if (window.lucide) window.lucide.createIcons({ root: epContainer });
+  }
+
+  function filterEpisodes(query) {
+    state.episodeFilterQuery = (query || '').trim().toLowerCase();
+    const clearBtn = document.getElementById('btnEpFilterClear');
+    if (clearBtn) clearBtn.style.display = state.episodeFilterQuery ? 'flex' : 'none';
+    renderEpisodeListHtml(state.currentSeasonEpisodes);
+  }
+
+  function clearEpisodeFilter() {
+    state.episodeFilterQuery = '';
+    const input = document.getElementById('episodeFilterInput');
+    const clearBtn = document.getElementById('btnEpFilterClear');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    renderEpisodeListHtml(state.currentSeasonEpisodes);
+  }
+
+  function playSpecificEpisode(idx) {
+    if (!state.currentSeasonEpisodes || !state.currentSeasonEpisodes[idx]) return;
+    state.currentPlayingEpisodeIdx = idx;
+    const ep = state.currentSeasonEpisodes[idx];
+    const seriesTitle = (state.activeMovie && state.activeMovie.title) || 'TV Series';
+    const cleanEp = cleanEpisodeTitle(ep.name);
+    const fullTitle = `${seriesTitle} • ${state.currentSeasonName || 'Season'} Episode ${idx + 1}: ${cleanEp}`;
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc')) {
+      autoOpenVlcOnComputer(ep.url, fullTitle);
+      renderEpisodeListHtml(state.currentSeasonEpisodes);
+      return;
+    }
+
+    closeDetails();
+    playMovie(ep.url, fullTitle);
+
+    const nav = document.getElementById('playerSeriesNav');
+    if (nav) nav.style.display = 'inline-flex';
+
+    updatePlayerEpisodeDrawer();
+    renderEpisodeListHtml(state.currentSeasonEpisodes);
+  }
+
+  function playNextEpisode() {
+    if (state.currentSeasonEpisodes && state.currentPlayingEpisodeIdx + 1 < state.currentSeasonEpisodes.length) {
+      showToast('Playing next episode...');
+      playSpecificEpisode(state.currentPlayingEpisodeIdx + 1);
+    } else {
+      showToast('End of this season');
+    }
+  }
+
+  function playPrevEpisode() {
+    if (state.currentSeasonEpisodes && state.currentPlayingEpisodeIdx > 0) {
+      showToast('Playing previous episode...');
+      playSpecificEpisode(state.currentPlayingEpisodeIdx - 1);
+    } else {
+      showToast('First episode of this season');
+    }
+  }
+
+  function togglePlayerEpDrawer(forceState) {
+    const drawer = document.getElementById('playerEpDrawer');
+    if (!drawer) return;
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('active');
+    drawer.classList.toggle('active', shouldOpen);
+    if (shouldOpen) {
+      updatePlayerEpisodeDrawer();
+    }
+  }
+
+  function updatePlayerEpisodeDrawer() {
+    const titleEl = document.getElementById('playerDrawerSeasonTitle');
+    const listEl = document.getElementById('playerDrawerEpList');
+    if (!listEl) return;
+
+    if (titleEl) {
+      titleEl.textContent = `${state.currentSeasonName || 'Season'} Episodes`;
+    }
+
+    if (!state.currentSeasonEpisodes || !state.currentSeasonEpisodes.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px;">No episodes loaded</div>';
+      return;
+    }
+
+    listEl.innerHTML = state.currentSeasonEpisodes
+      .map((ep, idx) => {
+        const isPlaying = idx === state.currentPlayingEpisodeIdx;
+        const cleanName = cleanEpisodeTitle(ep.name);
+        return `
+          <div class="player-drawer-ep-item ${isPlaying ? 'playing' : ''}" onclick="window.MovieList.playSpecificEpisode(${idx})">
+            <span class="item-ep-badge">${isPlaying ? '▶' : `E${(idx + 1) < 10 ? '0' : ''}${idx + 1}`}</span>
+            <span class="item-ep-title" title="${escapeQuotes(ep.name)}">${escapeHtml(cleanName)}</span>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  function downloadSeasonM3u() {
+    if (!state.currentSeasonEpisodes || state.currentSeasonEpisodes.length === 0) {
+      showToast('No episodes in this season');
+      return;
+    }
+    const seriesTitle = (state.activeMovie && state.activeMovie.title) || 'Series';
+    let m3u = `#EXTM3U\n#PLAYLIST:${seriesTitle} - ${state.currentSeasonName}\n\n`;
+    state.currentSeasonEpisodes.forEach((ep) => {
+      m3u += `#EXTINF:-1,${seriesTitle} - ${ep.name}\n${ep.url}\n\n`;
+    });
+
+    const cleanFileName = `${seriesTitle}_${state.currentSeasonName || 'Season'}`.replace(/[/\\?%*:|"<>]/g, '_');
+    const blob = new Blob([m3u], { type: 'application/x-mpegurl' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${cleanFileName}.m3u`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    showToast(`Exported ${state.currentSeasonName} Playlist (.m3u)`);
+  }
+
+  function exportSeasonLinksTxt() {
+    if (!state.currentSeasonEpisodes || state.currentSeasonEpisodes.length === 0) {
+      showToast('No episodes in this season');
+      return;
+    }
+    const seriesTitle = (state.activeMovie && state.activeMovie.title) || 'Series';
+    let text = `# CineBox Links Export: ${seriesTitle} - ${state.currentSeasonName}\n# Direct download URLs for IDM / 1DM / JDownloader\n\n`;
+    state.currentSeasonEpisodes.forEach((ep) => {
+      text += `${ep.url}\n`;
+    });
+
+    const cleanFileName = `${seriesTitle}_${state.currentSeasonName || 'Season'}_links`.replace(/[/\\?%*:|"<>]/g, '_');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${cleanFileName}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    showToast(`Exported ${state.currentSeasonName} links (.txt)`);
   }
 
   // External Player Engine (VLC, MX Player, PotPlayer, M3U Download)
@@ -1026,6 +1746,11 @@
     if (chkDefault && chkDefault.checked && playerType !== 'm3u' && playerType !== 'copy') {
       state.defaultPlayer = playerType;
       localStorage.setItem('movielist_default_player', playerType);
+      if (playerType === 'vlc') {
+        state.isVlcDesktopAuto = true;
+        localStorage.setItem('movielist_vlc_desktop_auto', 'true');
+      }
+      updateDesktopVlcUi();
     }
 
     closeExternalPlayerModal();
@@ -1046,6 +1771,8 @@
   function clearDefaultPlayer() {
     state.defaultPlayer = '';
     localStorage.removeItem('movielist_default_player');
+    state.isVlcDesktopAuto = false;
+    localStorage.removeItem('movielist_vlc_desktop_auto');
     const chkDefault = document.getElementById('chkSetDefaultPlayer');
     if (chkDefault) chkDefault.checked = false;
     const btnClear = document.getElementById('btnClearDefaultPlayer');
@@ -1056,6 +1783,7 @@
       if (badge) badge.style.display = 'none';
     });
 
+    updateDesktopVlcUi();
     showToast('Reset default external player');
   }
 
@@ -1105,12 +1833,24 @@
 
   // Built-in Video Player & Ambilight Engine
   function playMovie(url, title) {
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc')) {
+      autoOpenVlcOnComputer(url, title);
+      return;
+    }
+
     const playerModal = document.getElementById('playerModal');
     const video = document.getElementById('cinemaVideo');
     const titleEl = document.getElementById('playerTitle');
     if (!playerModal || !video) return;
 
     if (titleEl) titleEl.textContent = title || 'Playing Media';
+
+    // Toggle player series navigation if series episodes are loaded
+    const seriesNav = document.getElementById('playerSeriesNav');
+    if (seriesNav) {
+      seriesNav.style.display = (state.currentSeasonEpisodes && state.currentSeasonEpisodes.length > 0) ? 'inline-flex' : 'none';
+    }
 
     // Find full movie record for progress saving
     const currentMovie = state.allMovies.find((m) => m.videoUrl === url) || {
@@ -1153,6 +1893,12 @@
       stopAmbilightLoop();
     };
 
+    video.onended = () => {
+      if (state.currentSeasonEpisodes && state.currentSeasonEpisodes.length > 0 && state.currentPlayingEpisodeIdx >= 0) {
+        playNextEpisode();
+      }
+    };
+
     video.play().catch(() => {
       video.muted = true;
       video.play().catch(() => {});
@@ -1169,6 +1915,11 @@
       video.removeAttribute('src');
       video.load();
     }
+    const seriesNav = document.getElementById('playerSeriesNav');
+    if (seriesNav) seriesNav.style.display = 'none';
+    const epDrawer = document.getElementById('playerEpDrawer');
+    if (epDrawer) epDrawer.classList.remove('active');
+
     if (playerModal) {
       playerModal.classList.remove('active');
     }
@@ -1268,6 +2019,15 @@
           video.currentTime += 10;
         } else if (e.key === 'ArrowLeft') {
           video.currentTime -= 10;
+        } else if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          playNextEpisode();
+        } else if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          playPrevEpisode();
+        } else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          togglePlayerEpDrawer();
         }
       }
     });
@@ -1279,6 +2039,7 @@
     loadWatchlist();
     loadCatalog();
     setupKeybindings();
+    updateDesktopVlcUi();
 
     const searchInput = document.getElementById('searchInput');
     let searchDebounce = null;
@@ -1288,6 +2049,31 @@
         searchDebounce = setTimeout(() => {
           setSearch(e.target.value);
         }, 150);
+      });
+    }
+
+    const mobileSearchInput = document.getElementById('mobileSearchInput');
+    let mobileSearchDebounce = null;
+    if (mobileSearchInput) {
+      mobileSearchInput.addEventListener('input', (e) => {
+        clearTimeout(mobileSearchDebounce);
+        mobileSearchDebounce = setTimeout(() => {
+          setSearch(e.target.value);
+        }, 150);
+      });
+    }
+
+    const drawerOverlay = document.getElementById('categoryDrawerOverlay');
+    if (drawerOverlay) {
+      drawerOverlay.addEventListener('click', (e) => {
+        if (e.target === drawerOverlay) closeCategoryDrawer();
+      });
+    }
+
+    const epDrawer = document.getElementById('playerEpDrawer');
+    if (epDrawer) {
+      epDrawer.addEventListener('click', (e) => {
+        if (e.target === epDrawer) togglePlayerEpDrawer(false);
       });
     }
 
@@ -1358,7 +2144,24 @@
     openExternalFromPlayer,
     scrollToCategories,
     focusSearch,
-    toggleTheme
+    toggleTheme,
+    autoOpenVlcOnComputer,
+    toggleVlcDesktop,
+    openCategoryDrawer,
+    closeCategoryDrawer,
+    selectCategoryFromDrawer,
+    toggleMobileSearch,
+    clearMobileSearch,
+    selectIndexedSeason,
+    selectSpecialsTab,
+    filterEpisodes,
+    clearEpisodeFilter,
+    playSpecificEpisode,
+    playNextEpisode,
+    playPrevEpisode,
+    togglePlayerEpDrawer,
+    downloadSeasonM3u,
+    exportSeasonLinksTxt
   };
 
   if (document.readyState === 'loading') {

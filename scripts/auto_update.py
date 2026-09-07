@@ -350,7 +350,13 @@ def run_auto_update():
         json.dump(today_items, f, ensure_ascii=False, separators=(",", ":"))
     print(f"[+] Created data/today.json with {len(today_items)} items for {today_str}", flush=True)
 
-    # 7. Split into category files
+    # 7. Split into category files & dedicated separated home categories
+    categories_home_dir = os.path.join(DATA_DIR, "categories")
+    os.makedirs(categories_home_dir, exist_ok=True)
+
+    with open(os.path.join(categories_home_dir, "today.json"), "w", encoding="utf-8") as f:
+        json.dump(today_items[:16], f, ensure_ascii=False, separators=(",", ":"))
+
     home_categories = {
         "Today's Updates": today_items[:16],
         "Today": today_items[:16]
@@ -361,7 +367,12 @@ def run_auto_update():
         out_path = os.path.join(DATA_DIR, cat_info["file"])
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(matched, f, ensure_ascii=False, separators=(",", ":"))
-        print(f"   -> data/{cat_info['file']} ({cat_info['name']}): {len(matched)} items", flush=True)
+        
+        cat_home_path = os.path.join(categories_home_dir, f"{cat_key}.json")
+        with open(cat_home_path, "w", encoding="utf-8") as f:
+            json.dump(matched[:16], f, ensure_ascii=False, separators=(",", ":"))
+        
+        print(f"   -> data/{cat_info['file']} & data/categories/{cat_key}.json ({cat_info['name']}): {len(matched)} items", flush=True)
         home_categories[cat_info["tag"]] = matched[:16]
 
     # 8. Update home_data.json

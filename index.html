@@ -2,9 +2,13 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="theme-color" content="#050811">
-  <meta name="description" content="MovieList - Modern Glassmorphism Cinema Streaming Platform with Cinema Suite">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MovieList">
+  <meta name="description" content="MovieList - Modern Glassmorphism Cinema Streaming Platform">
   <title>MovieList - Modern Cinema Streaming</title>
   
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
@@ -45,12 +49,24 @@
 
       <!-- Header Search & Controls -->
       <div class="header-actions">
-        <div class="search-pill-wrapper">
+        <!-- Desktop Search Pill -->
+        <div class="search-pill-wrapper desktop-only">
           <input type="text" id="searchInput" class="search-input" placeholder="Search movies, series..." aria-label="Search movies">
           <button class="search-icon-btn" aria-label="Submit search">
             <i data-lucide="search" style="width:16px;height:16px;"></i>
           </button>
         </div>
+
+        <!-- Computer Auto-Open VLC Toggle Button -->
+        <button class="icon-action-btn vlc-desktop-toggle-btn desktop-only" id="btnDesktopVlcToggle" onclick="window.MovieList.toggleVlcDesktop()" title="Auto-Open VLC on Computer" aria-label="Auto-Open VLC on Computer">
+          <i data-lucide="play-circle" style="width:18px;height:18px;"></i>
+          <span class="vlc-desktop-toggle-label" id="lblDesktopVlc">VLC: OFF</span>
+        </button>
+
+        <!-- Mobile Search Toggle Button -->
+        <button class="icon-action-btn mobile-only" id="btnMobileSearchToggle" onclick="window.MovieList.toggleMobileSearch()" title="Search" aria-label="Search">
+          <i data-lucide="search" style="width:18px;height:18px;"></i>
+        </button>
 
         <button class="icon-action-btn" id="themeToggleBtn" onclick="window.MovieList.toggleTheme()" title="Toggle Theme" aria-label="Toggle dark and light theme">
           <i id="themeIcon" data-lucide="sun" style="width:18px;height:18px;"></i>
@@ -62,6 +78,17 @@
         </button>
       </div>
     </header>
+
+    <!-- Expandable Mobile App Search Bar -->
+    <div class="mobile-search-overlay-bar" id="mobileSearchBar" style="display: none;">
+      <div class="mobile-search-inner">
+        <i data-lucide="search" style="width:18px;height:18px;color:var(--primary);"></i>
+        <input type="text" id="mobileSearchInput" class="mobile-search-input-field" placeholder="Search movies, series, anime..." aria-label="Search">
+        <button class="mobile-search-close-btn" onclick="window.MovieList.toggleMobileSearch(false)" aria-label="Close search">
+          <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+    </div>
 
     <!-- Hero Featured Carousel -->
     <section class="hero-carousel-section" id="heroCarousel" aria-label="Featured Releases">
@@ -143,11 +170,11 @@
         <i data-lucide="home" style="width:20px;height:20px;"></i>
         <span>Home</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnCategories" onclick="window.MovieList.scrollToCategories()">
+      <button class="mobile-dock-btn" id="dockBtnCategories" onclick="window.MovieList.openCategoryDrawer()">
         <i data-lucide="layers" style="width:20px;height:20px;"></i>
         <span>Categories</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnSearch" onclick="window.MovieList.focusSearch()">
+      <button class="mobile-dock-btn" id="dockBtnSearch" onclick="window.MovieList.toggleMobileSearch(true)">
         <i data-lucide="search" style="width:20px;height:20px;"></i>
         <span>Search</span>
       </button>
@@ -165,6 +192,7 @@
   <!-- Movie Details Modal -->
   <div class="modal-overlay" id="detailsModal" role="dialog" aria-modal="true" aria-labelledby="modalMovieTitle">
     <div class="details-modal-card">
+      <div class="modal-drag-handle"></div>
       <button class="modal-close-btn" onclick="window.MovieList.closeDetails()" aria-label="Close modal">
         <i data-lucide="x" style="width:18px;height:18px;"></i>
       </button>
@@ -212,7 +240,7 @@
         <div class="modal-actions-row">
           <button class="btn-solid-primary" id="modalPlayBtn">
             <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
-            Play Movie
+            <span id="modalPlayBtnText">Play Movie</span>
           </button>
           <button class="btn-glass" id="modalExtPlayerBtn" onclick="window.MovieList.openExternalFromDetails()">
             <i data-lucide="tv" style="width:16px;height:16px;"></i>
@@ -250,6 +278,50 @@
             </button>
           </div>
         </div>
+
+        <!-- TV Series Episode & Season Selection Section -->
+        <div class="series-episodes-section" id="seriesEpisodesSection" style="display: none;">
+          <div class="series-section-divider"></div>
+          
+          <div class="series-header-row">
+            <div class="series-title-group">
+              <div class="series-title-row">
+                <i data-lucide="layers" style="width:18px;height:18px;color:var(--primary);"></i>
+                <h3 class="series-section-title">Seasons &amp; Episodes</h3>
+              </div>
+              <span class="series-count-badge" id="seasonCountBadge">Loading seasons...</span>
+            </div>
+
+            <!-- Season Batch Action Buttons -->
+            <div class="season-batch-actions">
+              <button class="season-batch-btn" id="btnExportSeasonM3u" onclick="window.MovieList.downloadSeasonM3u()" title="Export season playlist to play in VLC or media players">
+                <i data-lucide="list-music" style="width:14px;height:14px;"></i>
+                <span>Export M3U Playlist</span>
+              </button>
+              <button class="season-batch-btn" id="btnExportSeasonTxt" onclick="window.MovieList.exportSeasonLinksTxt()" title="Export all episode links for IDM / download managers">
+                <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+                <span>Export Links (.txt)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Season Tabs Selector -->
+          <div class="season-tabs-wrapper" id="seasonTabsWrapper">
+            <div class="season-tabs-row" id="seasonTabsRow"></div>
+          </div>
+
+          <!-- Episode Filter Input (for seasons with > 6 episodes) -->
+          <div class="episode-filter-box" id="episodeFilterBox" style="display: none;">
+            <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+            <input type="text" id="episodeFilterInput" class="ep-filter-input" placeholder="Filter episodes by name or number..." oninput="window.MovieList.filterEpisodes(this.value)" />
+            <button class="ep-filter-clear-btn" id="btnEpFilterClear" onclick="window.MovieList.clearEpisodeFilter()" style="display: none;" aria-label="Clear filter">
+              <i data-lucide="x" style="width:12px;height:12px;"></i>
+            </button>
+          </div>
+
+          <!-- Episode List Grid / Rows -->
+          <div class="episode-list-container" id="episodeListContainer"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -257,6 +329,7 @@
   <!-- Dedicated External Player Selection Modal -->
   <div class="modal-overlay" id="externalPlayersModal" role="dialog" aria-modal="true" aria-labelledby="extModalMovieTitle">
     <div class="ext-modal-card">
+      <div class="modal-drag-handle"></div>
       <button class="modal-close-btn" onclick="window.MovieList.closeExternalPlayerModal()" aria-label="Close external players modal">
         <i data-lucide="x" style="width:18px;height:18px;"></i>
       </button>
@@ -269,6 +342,18 @@
           <h3 class="ext-modal-title">Play in External App</h3>
           <p class="ext-modal-subtitle" id="extModalMovieTitle">Choose preferred media player</p>
         </div>
+      </div>
+
+      <!-- Computer VLC Auto-Open Card -->
+      <div class="vlc-computer-auto-card" id="vlcComputerAutoCard">
+        <div class="vlc-auto-left">
+          <div class="vlc-auto-badge">PC Auto-Open</div>
+          <span class="vlc-auto-title">VLC Player for Computer</span>
+          <span class="vlc-auto-desc">Automatically launch external VLC on your PC when clicking Play</span>
+        </div>
+        <button class="btn-toggle-vlc-auto" id="btnToggleVlcAuto" onclick="window.MovieList.toggleVlcDesktop()">
+          Enable Auto-Open
+        </button>
       </div>
 
       <div class="ext-player-options-list">
@@ -361,6 +446,22 @@
           <span class="player-media-title" id="playerTitle">Playing Media</span>
         </div>
         <div class="player-controls-top-right">
+          <!-- Series Episode Navigation Buttons -->
+          <div class="player-series-nav" id="playerSeriesNav" style="display: none;">
+            <button class="player-ep-nav-btn" id="btnPlayerPrevEp" onclick="window.MovieList.playPrevEpisode()" title="Previous Episode (Hotkey: P)" aria-label="Previous Episode">
+              <i data-lucide="skip-back" style="width:14px;height:14px;"></i>
+              <span class="nav-text">Prev</span>
+            </button>
+            <button class="player-ep-nav-btn" id="btnPlayerToggleEpDrawer" onclick="window.MovieList.togglePlayerEpDrawer()" title="Episodes List (Hotkey: E)" aria-label="Episode List">
+              <i data-lucide="list" style="width:14px;height:14px;"></i>
+              <span class="nav-text">Episodes</span>
+            </button>
+            <button class="player-ep-nav-btn" id="btnPlayerNextEp" onclick="window.MovieList.playNextEpisode()" title="Next Episode (Hotkey: N)" aria-label="Next Episode">
+              <span class="nav-text">Next</span>
+              <i data-lucide="skip-forward" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+
           <button class="player-pill-btn" onclick="window.MovieList.openExternalFromPlayer()" title="Play in External App (VLC / MX)">
             <i data-lucide="tv" style="width:14px;height:14px;"></i>
             <span>External App</span>
@@ -382,6 +483,20 @@
         </div>
       </div>
       <video id="cinemaVideo" class="cinema-video-el" controls playsinline preload="auto"></video>
+
+      <!-- In-Player Quick Episode Drawer -->
+      <div class="player-ep-drawer" id="playerEpDrawer">
+        <div class="player-ep-drawer-header">
+          <div class="drawer-header-left">
+            <i data-lucide="layers" style="width:16px;height:16px;color:var(--primary);"></i>
+            <span class="drawer-season-name" id="playerDrawerSeasonTitle">Season Episodes</span>
+          </div>
+          <button class="player-drawer-close-btn" onclick="window.MovieList.togglePlayerEpDrawer(false)" aria-label="Close episode drawer">
+            <i data-lucide="x" style="width:16px;height:16px;"></i>
+          </button>
+        </div>
+        <div class="player-ep-drawer-list" id="playerDrawerEpList"></div>
+      </div>
     </div>
   </div>
 
@@ -398,6 +513,91 @@
         </button>
       </div>
       <iframe id="trailerIframe" class="trailer-iframe" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <!-- Dedicated Mobile Category Bottom Sheet Drawer -->
+  <div class="drawer-overlay" id="categoryDrawerOverlay" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="category-drawer-sheet">
+      <div class="drawer-grab-handle"></div>
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <h3 class="drawer-title" id="drawerTitle">Explore Categories</h3>
+          <span class="drawer-subtitle">Browse cinema & TV collections</span>
+        </div>
+        <button class="drawer-close-btn" onclick="window.MovieList.closeCategoryDrawer()" aria-label="Close categories">
+          <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+
+      <div class="drawer-categories-grid">
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('All')">
+          <div class="drawer-cat-icon icon-all">
+            <i data-lucide="film" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">All Titles</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Today\'s Updates')">
+          <div class="drawer-cat-icon icon-today">
+            <i data-lucide="sparkles" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Today's Updates</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Top Rated')">
+          <div class="drawer-cat-icon icon-top">
+            <i data-lucide="star" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">IMDb Top 250</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Hollywood 1080p')">
+          <div class="drawer-cat-icon icon-hollywood">
+            <i data-lucide="globe" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Hollywood 1080p</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Bollywood')">
+          <div class="drawer-cat-icon icon-bollywood">
+            <i data-lucide="music" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Bollywood (Hindi)</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('South Action')">
+          <div class="drawer-cat-icon icon-south">
+            <i data-lucide="zap" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">South Action</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('TV Series')">
+          <div class="drawer-cat-icon icon-tv">
+            <i data-lucide="tv" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">TV & Web Series</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('K-Drama')">
+          <div class="drawer-cat-icon icon-kdrama">
+            <i data-lucide="heart" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Korean Drama</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Animation')">
+          <div class="drawer-cat-icon icon-anime">
+            <i data-lucide="smile" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Animation & Anime</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Bangla')">
+          <div class="drawer-cat-icon icon-bangla">
+            <i data-lucide="clapperboard" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Bangla Cinema</span>
+        </button>
+        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Watchlist')">
+          <div class="drawer-cat-icon icon-watchlist">
+            <i data-lucide="bookmark" style="width:20px;height:20px;"></i>
+          </div>
+          <span class="drawer-cat-name">Saved Watchlist</span>
+        </button>
+      </div>
     </div>
   </div>
 
