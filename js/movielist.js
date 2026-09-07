@@ -2921,14 +2921,18 @@
 
     playerModal.classList.add('active');
 
-    // Reset audio track selector to stereo
+    // Populate audio track selector from detected multi-audio tracks
     const audioSelect = document.getElementById('playerAudioTrackSelect');
-    if (audioSelect) {
-      audioSelect.innerHTML = `
-        <option value="stereo" selected>Audio: Stereo</option>
-        <option value="left">Audio 1: Left (Hindi / Dub)</option>
-        <option value="right">Audio 2: Right (English / Orig)</option>
-      `;
+    if (audioSelect && window.CineBoxAudio) {
+      const tracks = window.CineBoxAudio.setupMediaTracks(video, currentMovie.rawTitle || title, url);
+      audioSelect.innerHTML = '';
+      tracks.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = String(t.index);
+        opt.textContent = t.label;
+        if (t.enabled || t.index === 0) opt.selected = true;
+        audioSelect.appendChild(opt);
+      });
     }
 
     // Restore saved playback position
@@ -2949,39 +2953,24 @@
     };
 
     video.onloadedmetadata = () => {
-      // Auto-detect discrete multi-audio tracks when supported by browser
+      // Auto-detect discrete multi-audio tracks when supported natively by browser
       if (window.CineBoxAudio && audioSelect) {
-        const discreteTracks = window.CineBoxAudio.detectDiscreteTracks(video);
-        if (discreteTracks && discreteTracks.length > 1) {
+        const native = window.CineBoxAudio.detectNativeAudioTracks(video);
+        if (native && native.length > 1) {
           audioSelect.innerHTML = '';
-          discreteTracks.forEach((t) => {
+          native.forEach((t) => {
             const opt = document.createElement('option');
-            opt.value = t.id;
+            opt.value = String(t.index);
             opt.textContent = t.label;
             if (t.enabled) opt.selected = true;
             audioSelect.appendChild(opt);
           });
-          const sepOpt = document.createElement('option');
-          sepOpt.disabled = true;
-          sepOpt.textContent = '--- Dual Audio Channels ---';
-          audioSelect.appendChild(sepOpt);
-          const leftOpt = document.createElement('option');
-          leftOpt.value = 'left';
-          leftOpt.textContent = 'Channel 1: Left (Dub / Hindi)';
-          audioSelect.appendChild(leftOpt);
-          const rightOpt = document.createElement('option');
-          rightOpt.value = 'right';
-          rightOpt.textContent = 'Channel 2: Right (Orig / English)';
-          audioSelect.appendChild(rightOpt);
         }
       }
     };
 
     video.onplay = () => {
       startAmbilightLoop();
-      if (window.CineBoxAudio) {
-        window.CineBoxAudio.init(video);
-      }
     };
 
     video.onpause = () => {
@@ -3006,10 +2995,12 @@
     const video = document.getElementById('cinemaVideo');
     stopAmbilightLoop();
     if (window.CineBoxAudio) {
-      window.CineBoxAudio.reset(video);
+      window.CineBoxAudio.reset();
     }
     const audioSelect = document.getElementById('playerAudioTrackSelect');
-    if (audioSelect) audioSelect.value = 'stereo';
+    if (audioSelect) {
+      audioSelect.innerHTML = '<option value="0" selected>Audio: Default Track</option>';
+    }
     if (video) {
       video.pause();
       video.removeAttribute('src');
@@ -3081,15 +3072,15 @@
     }
   }
 
-  function setAudioTrack(mode) {
+  function setAudioTrack(trackIndex) {
     const video = document.getElementById('cinemaVideo');
-    if (!video) return;
-    if (window.CineBoxAudio) {
-      const res = window.CineBoxAudio.setAudioMode(mode, video);
-      if (res && res.label) {
-        showToast(`Audio: ${res.label}`);
-      } else if (res && res.error) {
-        showToast(res.error);
+    if (!video || !window.CineBoxAudio) return;
+    const res = window.CineBoxAudio.setAudioTrack(trackIndex, video);
+    if (res && res.label) {
+      if (res.native) {
+        showToast(`Switched to ${res.label}`);
+      } else {
+        showToast(`Selected ${res.label}. Tip: If audio does not change in browser, use External App (VLC / MX)`);
       }
     }
   }

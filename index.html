@@ -573,10 +573,8 @@
             <i data-lucide="tv" style="width:14px;height:14px;"></i>
             <span>External App</span>
           </button>
-          <select id="playerAudioTrackSelect" class="player-speed-select player-audio-select" onchange="window.MovieList.setAudioTrack(this.value)" title="Dual Audio & Audio Track Selector" aria-label="Audio Track Selector">
-            <option value="stereo" selected>Audio: Stereo</option>
-            <option value="left">Audio 1: Left (Hindi / Dub)</option>
-            <option value="right">Audio 2: Right (English / Orig)</option>
+          <select id="playerAudioTrackSelect" class="player-speed-select player-audio-select" onchange="window.MovieList.setAudioTrack(this.value)" title="Audio Track Selector" aria-label="Audio Track Selector">
+            <option value="0" selected>Audio: Default Track</option>
           </select>
           <select class="player-speed-select" onchange="window.MovieList.setPlaybackSpeed(this.value)" title="Playback Speed">
             <option value="0.75">0.75x</option>
