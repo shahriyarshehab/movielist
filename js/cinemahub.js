@@ -1,5 +1,5 @@
 /**
- * MovieList - Core Application Engine
+ * CinemaHub - Core Application Engine
  * Architecture: Ultra-Fast Glassmorphism SPA with Cinema Suite
  */
 
@@ -26,8 +26,8 @@
     ambilightEnabled: true,
     extSelectedUrl: '',
     extSelectedTitle: '',
-    defaultPlayer: localStorage.getItem('movielist_default_player') || '',
-    theme: localStorage.getItem('movielist_theme') || 'dark',
+    defaultPlayer: localStorage.getItem('cinemahub_default_player') || localStorage.getItem('movielist_default_player') || '',
+    theme: localStorage.getItem('cinemahub_theme') || localStorage.getItem('movielist_theme') || 'dark',
     allCatalogLoaded: false,
     tvCatalog: null,
     currentTvEntry: null,
@@ -201,7 +201,7 @@
   // Local Storage Watchlist Manager
   function loadWatchlist() {
     try {
-      const stored = JSON.parse(localStorage.getItem('movielist_watchlist') || '[]');
+      const stored = JSON.parse(localStorage.getItem('cinemahub_watchlist') || localStorage.getItem('movielist_watchlist') || '[]');
       state.watchlist = new Set(stored);
       updateWatchlistBadge();
     } catch (e) {
@@ -235,7 +235,7 @@
       showToast(`Added "${title || 'Movie'}" to Watchlist`);
     }
     try {
-      localStorage.setItem('movielist_watchlist', JSON.stringify([...state.watchlist]));
+      localStorage.setItem('cinemahub_watchlist', JSON.stringify([...state.watchlist]));
     } catch (e) {}
 
     updateWatchlistBadge();
@@ -270,7 +270,7 @@
   // Continue Watching & History Engine
   function loadHistory() {
     try {
-      state.history = JSON.parse(localStorage.getItem('movielist_history') || '[]');
+      state.history = JSON.parse(localStorage.getItem('cinemahub_history') || localStorage.getItem('movielist_history') || '[]');
     } catch (e) {
       state.history = [];
     }
@@ -304,7 +304,7 @@
     }
 
     try {
-      localStorage.setItem('movielist_history', JSON.stringify(state.history));
+      localStorage.setItem('cinemahub_history', JSON.stringify(state.history));
     } catch (e) {}
 
     renderContinueWatching();
@@ -317,7 +317,8 @@
     }
     state.history = state.history.filter((h) => h.videoUrl !== videoUrl);
     try {
-      localStorage.setItem('movielist_history', JSON.stringify(state.history));
+      localStorage.setItem('cinemahub_history', JSON.stringify(state.history));
+      localStorage.removeItem(`cinemahub_resume_${videoUrl}`);
       localStorage.removeItem(`movielist_resume_${videoUrl}`);
     } catch (e) {}
     showToast('Removed from Continue Watching');
@@ -339,13 +340,13 @@
       .map((item) => {
         const percent = item.progressPercent || 10;
         return `
-          <div class="cw-card" onclick="window.MovieList.playMovie('${escapeQuotes(item.videoUrl)}', '${escapeQuotes(item.title)}')">
+          <div class="cw-card" onclick="window.CinemaHub.playMovie('${escapeQuotes(item.videoUrl)}', '${escapeQuotes(item.title)}')">
             <div class="cw-thumbnail-wrap">
               <img class="cw-thumbnail-img" src="${sanitizeUrl(item.posterUrl)}" alt="${escapeQuotes(item.title)}" loading="lazy" onerror="this.src='icons/icon-512.png'">
               <div class="cw-play-btn">
                 <i data-lucide="play" style="width:20px;height:20px;fill:currentColor;"></i>
               </div>
-              <button class="cw-remove-btn" onclick="window.MovieList.removeHistory('${escapeQuotes(item.videoUrl)}', event)" title="Remove from list">
+              <button class="cw-remove-btn" onclick="window.CinemaHub.removeHistory('${escapeQuotes(item.videoUrl)}', event)" title="Remove from list">
                 <i data-lucide="x" style="width:14px;height:14px;"></i>
               </button>
             </div>
@@ -408,7 +409,7 @@
   function setTheme(theme) {
     if (state.theme === theme) return;
     state.theme = theme;
-    localStorage.setItem('movielist_theme', state.theme);
+    localStorage.setItem('cinemahub_theme', state.theme);
     initTheme();
     showToast(`Switched to ${state.theme === 'dark' ? 'Dark' : 'Light'} Mode`);
   }
@@ -786,19 +787,23 @@
                 ${movie.size ? `<span>${escapeHtml(movie.size)}</span>` : ''}
               </div>
               <div class="slide-buttons-row">
-                <button class="btn-solid-primary" onclick="window.MovieList.playMovie('${escapeQuotes(movie.videoUrl)}', '${escapeQuotes(movie.title)}')">
+                <button class="btn-solid-primary" onclick="window.CinemaHub.playMovie('${escapeQuotes(movie.videoUrl)}', '${escapeQuotes(movie.title)}')">
                   <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
                   Watch Now
                 </button>
-                <button class="btn-glass" onclick="window.MovieList.openTrailer('${escapeQuotes(movie.title)}')">
+                <button class="btn-glass btn-hero-m3u" onclick="window.CinemaHub.downloadM3u('${escapeQuotes(movie.videoUrl)}', '${escapeQuotes(movie.title)}')" title="Download M3U Playlist">
+                  <i data-lucide="list-music" style="width:16px;height:16px;"></i>
+                  M3U
+                </button>
+                <button class="btn-glass" onclick="window.CinemaHub.openTrailer('${escapeQuotes(movie.title)}')">
                   <i data-lucide="film" style="width:16px;height:16px;"></i>
                   Trailer
                 </button>
-                <button class="btn-glass" onclick="window.MovieList.openDetails('${movie.uid}')">
+                <button class="btn-glass" onclick="window.CinemaHub.openDetails('${movie.uid}')">
                   <i data-lucide="info" style="width:16px;height:16px;"></i>
                   Details
                 </button>
-                <button class="icon-action-btn ${isWatchlisted ? 'active' : ''}" onclick="window.MovieList.toggleWatchlistFromCard('${movie.uid}', event)" title="Watchlist">
+                <button class="icon-action-btn ${isWatchlisted ? 'active' : ''}" onclick="window.CinemaHub.toggleWatchlistFromCard('${movie.uid}', event)" title="Watchlist">
                   <i data-lucide="bookmark" style="width:18px;height:18px;${isWatchlisted ? 'fill:var(--accent);color:var(--accent);' : ''}"></i>
                 </button>
               </div>
@@ -812,7 +817,7 @@
       indicators.innerHTML = state.carouselMovies
         .map(
           (_, idx) =>
-            `<span class="indicator-dot ${idx === 0 ? 'active' : ''}" onclick="window.MovieList.goToSlide(${idx})"></span>`
+            `<span class="indicator-dot ${idx === 0 ? 'active' : ''}" onclick="window.CinemaHub.goToSlide(${idx})"></span>`
         )
         .join('');
     }
@@ -889,6 +894,8 @@
       loadSettingsState();
       if (window.lucide) window.lucide.createIcons({ root: drawer });
     }
+    const dockMenu = document.getElementById('dockBtnMenu');
+    if (dockMenu) dockMenu.classList.add('active');
   }
 
   function closeSettingsDrawer() {
@@ -902,35 +909,47 @@
         }
       }, 320);
     }
+    const dockMenu = document.getElementById('dockBtnMenu');
+    if (dockMenu) dockMenu.classList.remove('active');
+  }
+
+  function toggleSettingsDrawer() {
+    const drawer = document.getElementById('settingsDrawerOverlay');
+    if (drawer && drawer.classList.contains('active')) {
+      closeSettingsDrawer();
+    } else {
+      openSettingsDrawer();
+    }
   }
 
   function loadSettingsState() {
     const boosterSwitch = document.getElementById('settingVolumeBooster');
     const resumeSwitch = document.getElementById('settingAutoResume');
     if (boosterSwitch) {
-      boosterSwitch.checked = localStorage.getItem('movielist_booster_enabled') === 'true';
+      boosterSwitch.checked = (localStorage.getItem('cinemahub_booster_enabled') || localStorage.getItem('movielist_booster_enabled')) === 'true';
     }
     if (resumeSwitch) {
-      const savedResume = localStorage.getItem('movielist_auto_resume');
+      const savedResume = localStorage.getItem('cinemahub_auto_resume') || localStorage.getItem('movielist_auto_resume');
       resumeSwitch.checked = savedResume === null ? true : savedResume === 'true';
     }
   }
 
   function toggleSetting(key, value) {
     if (key === 'volumeBooster') {
-      localStorage.setItem('movielist_booster_enabled', value ? 'true' : 'false');
+      localStorage.setItem('cinemahub_booster_enabled', value ? 'true' : 'false');
       if (window.AudioEngine && typeof window.AudioEngine.setBooster === 'function') {
         window.AudioEngine.setBooster(value ? 2.5 : 1.0);
       }
       showToast(value ? 'Volume Booster enabled' : 'Volume Booster disabled');
     } else if (key === 'autoResume') {
-      localStorage.setItem('movielist_auto_resume', value ? 'true' : 'false');
+      localStorage.setItem('cinemahub_auto_resume', value ? 'true' : 'false');
       showToast(value ? 'Auto-Resume enabled' : 'Auto-Resume disabled');
     }
   }
 
   function clearContinueWatching() {
     try {
+      localStorage.removeItem('cinemahub_history');
       localStorage.removeItem('movielist_history');
       state.history = [];
       renderContinueWatching();
@@ -942,6 +961,7 @@
 
   function clearSearchHistory() {
     try {
+      localStorage.removeItem('cinemahub_recent_searches');
       localStorage.removeItem('movielist_recent_searches');
       showToast('Search history cleared');
     } catch (e) {
@@ -995,7 +1015,7 @@
     '4K UHD'
   ];
 
-  const RECENT_SEARCHES_KEY = 'movielist_recent_searches';
+  const RECENT_SEARCHES_KEY = 'cinemahub_recent_searches';
   const MAX_RECENT_SEARCHES = 8;
 
   function getRecentSearches() {
@@ -1150,15 +1170,15 @@
       html += `
         <div class="search-dropdown-header">
           <span>Recent Searches</span>
-          <button class="search-dropdown-clear-btn" onclick="window.MovieList.clearRecentSearches(event)">Clear</button>
+          <button class="search-dropdown-clear-btn" onclick="window.CinemaHub.clearRecentSearches(event)">Clear</button>
         </div>
         <div class="search-tags-container">
           ${recent
             .map(
               (term) => `
-            <span class="search-tag-chip" onclick="window.MovieList.fillAndSearch('${escapeQuotes(term)}')">
+            <span class="search-tag-chip" onclick="window.CinemaHub.fillAndSearch('${escapeQuotes(term)}')">
               <span>${escapeHtml(term)}</span>
-              <span class="search-tag-chip-remove" onclick="window.MovieList.removeRecentSearch('${escapeQuotes(term)}', event)" title="Remove">&times;</span>
+              <span class="search-tag-chip-remove" onclick="window.CinemaHub.removeRecentSearch('${escapeQuotes(term)}', event)" title="Remove">&times;</span>
             </span>
           `
             )
@@ -1174,7 +1194,7 @@
       <div class="search-tags-container">
         ${POPULAR_SEARCH_TERMS.map(
           (term) => `
-          <span class="search-tag-chip" onclick="window.MovieList.fillAndSearch('${escapeQuotes(term)}')">
+          <span class="search-tag-chip" onclick="window.CinemaHub.fillAndSearch('${escapeQuotes(term)}')">
             <span>${escapeHtml(term)}</span>
           </span>
         `
@@ -1220,7 +1240,7 @@
         return `
           <div class="search-dropdown-item" 
                data-dropdown-idx="${idx}"
-               onclick="window.MovieList.selectSearchItem('${escapeQuotes(m.id)}', '${escapeQuotes(trimmed)}')">
+               onclick="window.CinemaHub.selectSearchItem('${escapeQuotes(m.id)}', '${escapeQuotes(trimmed)}')">
             <img class="search-dropdown-poster" 
                  src="${sanitizeUrl(m.posterUrl)}" 
                  alt="${escapeQuotes(m.title)}" 
@@ -1239,7 +1259,7 @@
               <button class="search-dropdown-play-btn" 
                       title="Play Now" 
                       aria-label="Play Now"
-                      onclick="window.MovieList.selectPlaySearchItem('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', '${escapeQuotes(trimmed)}', event)">
+                      onclick="window.CinemaHub.selectPlaySearchItem('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', '${escapeQuotes(trimmed)}', event)">
                 ${playSvg}
               </button>
             </div>
@@ -1249,7 +1269,7 @@
       .join('');
 
     const footerHtml = `
-      <div class="search-dropdown-footer" onclick="window.MovieList.viewAllSearchResults('${escapeQuotes(trimmed)}')">
+      <div class="search-dropdown-footer" onclick="window.CinemaHub.viewAllSearchResults('${escapeQuotes(trimmed)}')">
         <span>View all ${totalMatches.toLocaleString()} results in catalog</span>
         <span>&rarr;</span>
       </div>
@@ -1414,6 +1434,7 @@
     const dockSeries = document.getElementById('dockBtnSeries');
     const dockCategories = document.getElementById('dockBtnCategories');
     const dockWatchlist = document.getElementById('dockBtnWatchlist');
+    const dockMenu = document.getElementById('dockBtnMenu');
 
     const isMovies = ['Hollywood 1080p', 'Bollywood', 'South Action', 'Bangla'].includes(cat);
     const isSeries = ['TV Series', 'K-Drama', 'Animation'].includes(cat);
@@ -1423,6 +1444,7 @@
     if (dockSeries) dockSeries.classList.toggle('active', isSeries);
     if (dockWatchlist) dockWatchlist.classList.toggle('active', cat === 'Watchlist');
     if (dockCategories) dockCategories.classList.toggle('active', cat !== 'All' && !isMovies && !isSeries && cat !== 'Watchlist');
+    if (dockMenu) dockMenu.classList.remove('active');
 
     if (cat === 'All') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1474,20 +1496,20 @@
     const starSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
 
     return `
-      <div class="movie-card" data-movie-uid="${safeUid}" onclick="window.MovieList.openDetails('${safeUid}')">
+      <div class="movie-card" data-movie-uid="${safeUid}" onclick="window.CinemaHub.openDetails('${safeUid}')">
         <div class="card-poster-wrap">
           <span class="card-badge-top-left">${escapeHtml(m.quality)}</span>
           <div class="card-actions-top-right">
             <button class="card-icon-action card-ext-btn" 
                     data-movie-uid="${safeUid}"
-                    onclick="window.MovieList.onCardExtClick('${safeUid}', event)" 
+                    onclick="window.CinemaHub.onCardExtClick('${safeUid}', event)" 
                     title="Play in External App (VLC / MX Player)" 
                     aria-label="Play in External App">
               ${tvSvg}
             </button>
             <button class="card-icon-action card-watchlist-btn ${isWatchlisted ? 'active' : ''}" 
                     data-movie-uid="${safeUid}"
-                    onclick="window.MovieList.toggleWatchlistFromCard('${safeUid}', event)" 
+                    onclick="window.CinemaHub.toggleWatchlistFromCard('${safeUid}', event)" 
                     title="Save to Watchlist" 
                     aria-label="Save to Watchlist">
               ${bookmarkSvg}
@@ -1520,7 +1542,7 @@
   // "Show All" Card at End of Category Row
   function renderShowAllCardHtml(catKey, catName, count) {
     return `
-      <div class="movie-card show-all-card" data-category="${escapeQuotes(catKey)}" onclick="window.MovieList.setCategory(this.dataset.category)">
+      <div class="movie-card show-all-card" data-category="${escapeQuotes(catKey)}" onclick="window.CinemaHub.setCategory(this.dataset.category)">
         <div class="show-all-card-inner">
           <div class="show-all-glow-orb"></div>
           <div class="show-all-icon-circle">
@@ -1553,15 +1575,15 @@
       html += `
         <div class="category-row-block">
           <div class="row-header">
-            <div class="row-title-wrap" data-category="${escapeQuotes(catConfig.key)}" onclick="window.MovieList.setCategory(this.dataset.category)">
+            <div class="row-title-wrap" data-category="${escapeQuotes(catConfig.key)}" onclick="window.CinemaHub.setCategory(this.dataset.category)">
               <h2 class="row-heading">${escapeHtml(catConfig.name)}</h2>
               <span class="row-badge">${items.length} Titles</span>
             </div>
             <div class="row-controls">
-              <button class="row-nav-btn prev" onclick="window.MovieList.slideRow('${sliderId}', -1)" aria-label="Previous">
+              <button class="row-nav-btn prev" onclick="window.CinemaHub.slideRow('${sliderId}', -1)" aria-label="Previous">
                 <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
               </button>
-              <button class="row-nav-btn next" onclick="window.MovieList.slideRow('${sliderId}', 1)" aria-label="Next">
+              <button class="row-nav-btn next" onclick="window.CinemaHub.slideRow('${sliderId}', 1)" aria-label="Next">
                 <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
               </button>
             </div>
@@ -1827,6 +1849,12 @@
     const btnPot = document.getElementById('extBtnPot');
     if (btnPot) btnPot.onclick = () => launchPotPlayer(movie.videoUrl, movie.title);
 
+    const btnM3u = document.getElementById('extBtnM3u');
+    if (btnM3u) btnM3u.onclick = () => downloadCurrentMovieM3u();
+
+    const modalM3uBtn = document.getElementById('modalM3uBtn');
+    if (modalM3uBtn) modalM3uBtn.onclick = () => downloadCurrentMovieM3u();
+
     const btnCopy = document.getElementById('extBtnCopy');
     if (btnCopy) btnCopy.onclick = () => copyStreamLink(movie.videoUrl);
 
@@ -2018,9 +2046,10 @@
       return preloaded[cleanName.toLowerCase()];
     }
 
-    const cacheKey = `movielist_meta_${cleanName.toLowerCase()}_${year || ''}`;
+    const cacheKey = `cinemahub_meta_${cleanName.toLowerCase()}_${year || ''}`;
+    const legacyKey = `movielist_meta_${cleanName.toLowerCase()}_${year || ''}`;
     try {
-      const cached = localStorage.getItem(cacheKey);
+      const cached = localStorage.getItem(cacheKey) || localStorage.getItem(legacyKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Date.now() - parsed._cachedAt < 1000 * 60 * 60 * 24 * 14) {
@@ -2145,7 +2174,8 @@
 
   async function getActorPortraitPhoto(actorName) {
     if (!actorName) return null;
-    const cacheKey = `movielist_actor_${actorName.toLowerCase().replace(/\s+/g, '_')}`;
+    const cacheKey = `cinemahub_actor_${actorName.toLowerCase().replace(/\s+/g, '_')}`;
+    const legacyKey = `movielist_actor_${actorName.toLowerCase().replace(/\s+/g, '_')}`;
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
@@ -2470,7 +2500,7 @@
         .map((s, idx) => {
           const sName = s[0];
           return `
-            <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" data-season-idx="${idx}" data-season-name="${escapeQuotes(sName)}" onclick="window.MovieList.selectIndexedSeason(${idx}, this.dataset.seasonName)">
+            <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" data-season-idx="${idx}" data-season-name="${escapeQuotes(sName)}" onclick="window.CinemaHub.selectIndexedSeason(${idx}, this.dataset.seasonName)">
               ${escapeHtml(sName)}
             </button>
           `;
@@ -2479,7 +2509,7 @@
 
       if (specials.length > 0) {
         tabsHtml += `
-          <button class="season-pill-btn specials-pill" onclick="window.MovieList.selectSpecialsTab()" style="display:inline-flex;align-items:center;gap:5px;">
+          <button class="season-pill-btn specials-pill" onclick="window.CinemaHub.selectSpecialsTab()" style="display:inline-flex;align-items:center;gap:5px;">
             <i data-lucide="star" style="width:12px;height:12px;fill:currentColor;"></i>
             <span>Specials (${specials.length})</span>
           </button>
@@ -2580,7 +2610,7 @@
         const cleanName = cleanEpisodeTitle(ep.name);
 
         return `
-          <div class="ep-card ${isPlaying ? 'playing' : ''}" onclick="window.MovieList.playSpecificEpisode(${originalIdx})">
+          <div class="ep-card ${isPlaying ? 'playing' : ''}" onclick="window.CinemaHub.playSpecificEpisode(${originalIdx})">
             <div class="ep-left-wrap">
               <div class="ep-index-badge">
                 ${isPlaying ? '<i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i>' : `E${(originalIdx + 1) < 10 ? '0' : ''}${originalIdx + 1}`}
@@ -2595,11 +2625,14 @@
               </div>
             </div>
             <div class="ep-action-btns" onclick="event.stopPropagation();">
-              <button class="ep-icon-btn ep-btn-stream" onclick="window.MovieList.playSpecificEpisode(${originalIdx})" title="Stream Episode">
+              <button class="ep-icon-btn ep-btn-stream" onclick="window.CinemaHub.playSpecificEpisode(${originalIdx})" title="Stream Episode">
                 <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i>
               </button>
-              <button class="ep-icon-btn ep-btn-ext" onclick="window.MovieList.openExternalPlayerFromEpisode(${originalIdx}, event)" title="Play in VLC / MX Player">
+              <button class="ep-icon-btn ep-btn-ext" onclick="window.CinemaHub.openExternalPlayerFromEpisode(${originalIdx}, event)" title="Play in VLC / MX Player">
                 <i data-lucide="tv" style="width:14px;height:14px;"></i>
+              </button>
+              <button class="ep-icon-btn ep-btn-m3u" onclick="window.CinemaHub.downloadEpisodeM3u(${originalIdx}, event)" title="Download Episode M3U Playlist">
+                <i data-lucide="list-music" style="width:14px;height:14px;"></i>
               </button>
               <a class="ep-icon-btn ep-btn-download" href="${sanitizeUrl(ep.url)}" download title="Direct Download" target="_blank" rel="noopener">
                 <i data-lucide="download" style="width:14px;height:14px;"></i>
@@ -2705,13 +2738,20 @@
         const isPlaying = idx === state.currentPlayingEpisodeIdx;
         const cleanName = cleanEpisodeTitle(ep.name);
         return `
-          <div class="player-drawer-ep-item ${isPlaying ? 'playing' : ''}" onclick="window.MovieList.playSpecificEpisode(${idx})">
-            <span class="item-ep-badge">${isPlaying ? '▶' : `E${(idx + 1) < 10 ? '0' : ''}${idx + 1}`}</span>
+          <div class="player-drawer-ep-item ${isPlaying ? 'playing' : ''}" onclick="window.CinemaHub.playSpecificEpisode(${idx})">
+            <span class="item-ep-badge">${isPlaying ? '<i data-lucide="play" style="width:10px;height:10px;fill:currentColor;"></i>' : `E${(idx + 1) < 10 ? '0' : ''}${idx + 1}`}</span>
             <span class="item-ep-title" title="${escapeQuotes(ep.name)}">${escapeHtml(cleanName)}</span>
+            <button class="player-drawer-ep-m3u" onclick="event.stopPropagation(); window.CinemaHub.downloadEpisodeM3u(${idx}, event)" title="Download Episode M3U">
+              <i data-lucide="list-music" style="width:13px;height:13px;"></i>
+            </button>
           </div>
         `;
       })
       .join('');
+
+    if (window.lucide) {
+      try { window.lucide.createIcons({ root: listEl }); } catch (e) {}
+    }
   }
 
   function downloadSeasonM3u() {
@@ -2719,13 +2759,16 @@
       showToast('No episodes in this season');
       return;
     }
-    const seriesTitle = (state.activeMovie && state.activeMovie.title) || 'Series';
-    let m3u = `#EXTM3U\n#PLAYLIST:${seriesTitle} - ${state.currentSeasonName}\n\n`;
-    state.currentSeasonEpisodes.forEach((ep) => {
-      m3u += `#EXTINF:-1,${seriesTitle} - ${ep.name}\n${ep.url}\n\n`;
+    const rawTitle = (state.activeMovie && state.activeMovie.title) || 'Series';
+    const seriesTitle = cleanTitle(rawTitle).title || rawTitle;
+    const seasonName = state.currentSeasonName || 'Season';
+    let m3u = `#EXTM3U\n#PLAYLIST:${seriesTitle} - ${seasonName}\n\n`;
+    state.currentSeasonEpisodes.forEach((ep, idx) => {
+      const epClean = cleanEpisodeTitle(ep.name);
+      m3u += `#EXTINF:-1,${seriesTitle} - ${seasonName} E${(idx + 1) < 10 ? '0' : ''}${idx + 1} - ${epClean}\n${ep.url}\n\n`;
     });
 
-    const cleanFileName = `${seriesTitle}_${state.currentSeasonName || 'Season'}`.replace(/[/\\?%*:|"<>]/g, '_');
+    const cleanFileName = `${seriesTitle}_${seasonName}`.replace(/[/\\?%*:|"<>]/g, '_');
     const blob = new Blob([m3u], { type: 'application/x-mpegurl' });
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2735,7 +2778,7 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    showToast(`Exported ${state.currentSeasonName} Playlist (.m3u)`);
+    showToast(`Exported ${seasonName} Playlist (.m3u)`);
   }
 
   function exportSeasonLinksTxt() {
@@ -2800,12 +2843,55 @@
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
-    a.download = `${name.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'movie'}.m3u`;
+    a.download = `${name.replace(/[/\\?%*:|"<>]/g, '_').trim() || 'movie'}.m3u`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     showToast('Downloaded M3U Playlist file');
+  }
+
+  function downloadCurrentMovieM3u() {
+    if (!state.activeMovie) {
+      showToast('No media selected');
+      return;
+    }
+    if (isTvSeries(state.activeMovie)) {
+      if (state.currentSeasonEpisodes && state.currentSeasonEpisodes.length > 0) {
+        downloadSeasonM3u();
+      } else {
+        downloadM3u(state.activeMovie.videoUrl, state.activeMovie.title);
+      }
+    } else {
+      downloadM3u(state.activeMovie.videoUrl, state.activeMovie.title);
+    }
+  }
+
+  function downloadPlayerM3u() {
+    const video = document.getElementById('cinemaVideo');
+    const titleEl = document.getElementById('playerTitle');
+    const title = titleEl ? titleEl.textContent : 'Stream';
+    const url = (video && video.src) ? video.src : (state.activeMovie ? state.activeMovie.videoUrl : '');
+    if (url) {
+      downloadM3u(url, title);
+    } else {
+      showToast('No active stream to download');
+    }
+  }
+
+  function downloadEpisodeM3u(epIdx, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const ep = state.currentSeasonEpisodes && state.currentSeasonEpisodes[epIdx];
+    if (!ep) return;
+    const rawTitle = (state.activeMovie && state.activeMovie.title) || 'Series';
+    const seriesTitle = cleanTitle(rawTitle).title || rawTitle;
+    const cleanName = cleanEpisodeTitle(ep.name);
+    const seasonName = state.currentSeasonName || 'Season';
+    const title = `${seriesTitle} - ${seasonName} E${(epIdx + 1) < 10 ? '0' : ''}${epIdx + 1} - ${cleanName}`;
+    downloadM3u(ep.url, title);
   }
 
   function copyStreamLink(url) {
@@ -2919,7 +3005,7 @@
     const chkDefault = document.getElementById('chkSetDefaultPlayer');
     if (chkDefault && chkDefault.checked && playerType !== 'm3u' && playerType !== 'copy') {
       state.defaultPlayer = playerType;
-      localStorage.setItem('movielist_default_player', playerType);
+      localStorage.setItem('cinemahub_default_player', playerType);
     }
 
     closeExternalPlayerModal();
@@ -2931,7 +3017,11 @@
     } else if (playerType === 'pot') {
       launchPotPlayer(url, title);
     } else if (playerType === 'm3u') {
-      downloadM3u(url, title);
+      if (!overrideUrl && state.activeMovie && isTvSeries(state.activeMovie) && state.currentSeasonEpisodes && state.currentSeasonEpisodes.length > 0) {
+        downloadSeasonM3u();
+      } else {
+        downloadM3u(url, title);
+      }
     } else if (playerType === 'copy') {
       copyStreamLink(url);
     }
@@ -2939,6 +3029,7 @@
 
   function clearDefaultPlayer() {
     state.defaultPlayer = '';
+    localStorage.removeItem('cinemahub_default_player');
     localStorage.removeItem('movielist_default_player');
     const chkDefault = document.getElementById('chkSetDefaultPlayer');
     if (chkDefault) chkDefault.checked = false;
@@ -3452,8 +3543,9 @@
     }
 
     // Restore saved playback position
-    const resumeKey = `movielist_resume_${url}`;
-    const savedTime = parseFloat(localStorage.getItem(resumeKey) || '0');
+    const resumeKey = `cinemahub_resume_${url}`;
+    const legacyResumeKey = `movielist_resume_${url}`;
+    const savedTime = parseFloat(localStorage.getItem(resumeKey) || localStorage.getItem(legacyResumeKey) || '0');
     if (savedTime > 15) {
       video.currentTime = savedTime;
     }
@@ -3742,9 +3834,10 @@
     loadCatalog();
     setupKeybindings();
     try {
+      localStorage.removeItem('cinemahub_vlc_desktop');
       localStorage.removeItem('movielist_vlc_desktop');
       localStorage.removeItem('movielist_vlc_desktop_auto');
-      if (localStorage.getItem('movielist_default_player') === 'vlc') {
+      if (localStorage.getItem('cinemahub_default_player') === 'vlc' || localStorage.getItem('movielist_default_player') === 'vlc') {
         localStorage.removeItem('movielist_default_player');
         state.defaultPlayer = '';
       }
@@ -3930,7 +4023,7 @@
   }
 
   // Public API
-  window.MovieList = {
+  window.CinemaHub = {
     setCategory,
     setSort,
     nextSlide,
@@ -3970,6 +4063,9 @@
     launchMX,
     launchPotPlayer,
     downloadM3u,
+    downloadCurrentMovieM3u,
+    downloadPlayerM3u,
+    downloadEpisodeM3u,
     copyStreamLink,
     openExternalPlayerModal,
     closeExternalPlayerModal,
@@ -3985,6 +4081,7 @@
     setTheme,
     openSettingsDrawer,
     closeSettingsDrawer,
+    toggleSettingsDrawer,
     toggleSetting,
     clearContinueWatching,
     clearSearchHistory,
@@ -4013,6 +4110,9 @@
     scrollToCatalog,
     loadMoreGrid
   };
+
+  // Backwards-compatibility alias
+  window.MovieList = window.CinemaHub;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

@@ -1,8 +1,8 @@
-# MovieList
+# CinemaHub
 
 Modern Cinema Streaming and HD Media Platform
 
-MovieList is an open-source, high-performance cinema web application designed for ultra-fast performance on broadband and BDIX (Bangladesh Internet Exchange) networks. It provides instant streaming for movies, television series, anime, and dramas with a glassmorphic user interface, built-in cinema player, smart multi-token search, and native external player support.
+CinemaHub is an open-source, high-performance cinema web application designed for ultra-fast performance on broadband and BDIX (Bangladesh Internet Exchange) networks. It provides instant streaming for movies, television series, anime, and dramas with a glassmorphic user interface, built-in cinema player, smart multi-token search, and native external player support.
 
 Live Site: [https://shahriyarshehab.github.io/movielist/](https://shahriyarshehab.github.io/movielist/)
 
@@ -35,7 +35,7 @@ GitHub Repository: [https://github.com/shahriyarshehab/movielist](https://github
 
 ## Overview
 
-MovieList is engineered for instantaneous response times and zero-latency browsing across media catalogs exceeding 18,900 titles. Built using standard ES6+ JavaScript, custom glassmorphic CSS, and a Node.js development server, MovieList functions as both a responsive web application and an installable Progressive Web App (PWA).
+CinemaHub is engineered for instantaneous response times and zero-latency browsing across media catalogs exceeding 18,900 titles. Built using standard ES6+ JavaScript, custom glassmorphic CSS, and a Node.js development server, CinemaHub functions as both a responsive web application and an installable Progressive Web App (PWA).
 
 Content is fetched directly from high-speed HTTP file nodes. The application separates initial home payloads into lightweight category slices for a 10-20ms first contentful paint, then streams complete background catalogs asynchronously without locking the main browser thread.
 
@@ -59,12 +59,13 @@ Content is fetched directly from high-speed HTTP file nodes. The application sep
 ## Architecture and Directory Structure
 
 ```
-movielist/
+cinemahub/
 ├── index.html              # Main Single Page Application interface
 ├── css/
-│   └── movielist.css       # Glassmorphism design system, responsive styles, and animations
+│   └── cinemahub.css       # Glassmorphism design system, responsive styles, and animations
 ├── js/
-│   ├── movielist.js        # Core application controller, player, search, and TV episode engine
+│   ├── cinemahub.js        # Core application controller, player, search, and TV episode engine
+│   ├── audio-engine.js     # Multi-audio track switching engine & Web Audio DSP
 │   └── lucide.min.js       # Lucide vector icon runtime library
 ├── server.js               # Node.js HTTP server with Range request seeking and SSE live reload
 ├── sw.js                   # Progressive Web App Service Worker (Stale-While-Revalidate)

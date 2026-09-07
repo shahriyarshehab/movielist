@@ -1,8 +1,8 @@
 {
-  "id": "/movielist/",
-  "name": "MovieList - Stream & Browse Movies",
-  "short_name": "MovieList",
-  "description": "Modern cinema and streaming web portal featuring thousands of movies, TV series, and posters.",
+  "id": "/cinemahub/",
+  "name": "CinemaHub - Stream & Browse Movies",
+  "short_name": "CinemaHub",
+  "description": "CinemaHub - Modern cinema and streaming web portal featuring thousands of movies, TV series, and posters.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

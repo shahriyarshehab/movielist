@@ -1,11 +1,11 @@
-const CACHE_NAME = 'movielist-v12';
+const CACHE_NAME = 'cinemahub-v15';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/movielist.css',
+  './css/cinemahub.css',
   './js/lucide.min.js',
   './js/audio-engine.js',
-  './js/movielist.js',
+  './js/cinemahub.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

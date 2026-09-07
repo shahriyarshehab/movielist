@@ -1,20 +1,20 @@
 {
-  "name": "movielist",
+  "name": "cinemahub",
   "version": "1.0.0",
-  "description": "MovieList - Modern Cinema Streaming Platform",
+  "description": "CinemaHub - Modern Cinema Streaming Platform",
   "main": "server.js",
   "bin": {
-    "movielist": "./server.js"
+    "cinemahub": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",
     "serve": "node server.js --open",
-    "lint": "node -c js/audio-engine.js js/movielist.js server.js",
+    "lint": "node -c js/audio-engine.js js/cinemahub.js server.js",
     "update": "python scripts/auto_update.py"
   },
   "keywords": [
-    "movielist",
+    "cinemahub",
     "streaming",
     "video-player",
     "movies",
