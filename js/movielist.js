@@ -37,7 +37,10 @@
     currentPlayingEpisodeIdx: -1,
     episodeFilterQuery: '',
     gridRenderLimit: 48,
-    lastBrowseScrollY: 0
+    lastBrowseScrollY: 0,
+    playerControlsTimeout: null,
+    isScrubbing: false,
+    activeAudioTrackIndex: 0
   };
 
   let movieSequenceId = 0;
@@ -252,10 +255,15 @@
 
   function updateWatchlistBadge() {
     const badge = document.getElementById('watchlistBadge');
+    const dockBadge = document.getElementById('dockWatchlistBadge');
+    const count = state.watchlist.size;
     if (badge) {
-      const count = state.watchlist.size;
       badge.textContent = count;
       badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+    if (dockBadge) {
+      dockBadge.textContent = count;
+      dockBadge.style.display = count > 0 ? 'flex' : 'none';
     }
   }
 
@@ -393,14 +401,27 @@
     if (dockThemeIcon) {
       dockThemeIcon.setAttribute('data-lucide', iconName);
     }
+    updateThemeControls();
     if (window.lucide) window.lucide.createIcons();
   }
 
-  function toggleTheme() {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  function setTheme(theme) {
+    if (state.theme === theme) return;
+    state.theme = theme;
     localStorage.setItem('movielist_theme', state.theme);
     initTheme();
     showToast(`Switched to ${state.theme === 'dark' ? 'Dark' : 'Light'} Mode`);
+  }
+
+  function toggleTheme() {
+    setTheme(state.theme === 'dark' ? 'light' : 'dark');
+  }
+
+  function updateThemeControls() {
+    const darkBtn = document.getElementById('themeSegmentDark');
+    const lightBtn = document.getElementById('themeSegmentLight');
+    if (darkBtn) darkBtn.classList.toggle('active', state.theme === 'dark');
+    if (lightBtn) lightBtn.classList.toggle('active', state.theme === 'light');
   }
 
   // Category Multi-Row Configuration (CineBox Classical Layout)
@@ -833,6 +854,7 @@
       drawer.style.display = 'flex';
       void drawer.offsetHeight; // Force reflow for smooth animation
       drawer.classList.add('active');
+      document.body.style.overflow = 'hidden';
       if (window.lucide) window.lucide.createIcons({ root: drawer });
     }
   }
@@ -841,6 +863,7 @@
     const drawer = document.getElementById('categoryDrawerOverlay');
     if (drawer) {
       drawer.classList.remove('active');
+      document.body.style.overflow = '';
       setTimeout(() => {
         if (!drawer.classList.contains('active')) {
           drawer.style.display = 'none';
@@ -852,6 +875,78 @@
   function selectCategoryFromDrawer(cat) {
     closeCategoryDrawer();
     setCategory(cat);
+  }
+
+  // Settings & Preferences Drawer Management
+  function openSettingsDrawer() {
+    const drawer = document.getElementById('settingsDrawerOverlay');
+    if (drawer) {
+      drawer.style.display = 'flex';
+      void drawer.offsetHeight; // Force reflow
+      drawer.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      updateThemeControls();
+      loadSettingsState();
+      if (window.lucide) window.lucide.createIcons({ root: drawer });
+    }
+  }
+
+  function closeSettingsDrawer() {
+    const drawer = document.getElementById('settingsDrawerOverlay');
+    if (drawer) {
+      drawer.classList.remove('active');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        if (!drawer.classList.contains('active')) {
+          drawer.style.display = 'none';
+        }
+      }, 320);
+    }
+  }
+
+  function loadSettingsState() {
+    const boosterSwitch = document.getElementById('settingVolumeBooster');
+    const resumeSwitch = document.getElementById('settingAutoResume');
+    if (boosterSwitch) {
+      boosterSwitch.checked = localStorage.getItem('movielist_booster_enabled') === 'true';
+    }
+    if (resumeSwitch) {
+      const savedResume = localStorage.getItem('movielist_auto_resume');
+      resumeSwitch.checked = savedResume === null ? true : savedResume === 'true';
+    }
+  }
+
+  function toggleSetting(key, value) {
+    if (key === 'volumeBooster') {
+      localStorage.setItem('movielist_booster_enabled', value ? 'true' : 'false');
+      if (window.AudioEngine && typeof window.AudioEngine.setBooster === 'function') {
+        window.AudioEngine.setBooster(value ? 2.5 : 1.0);
+      }
+      showToast(value ? 'Volume Booster enabled' : 'Volume Booster disabled');
+    } else if (key === 'autoResume') {
+      localStorage.setItem('movielist_auto_resume', value ? 'true' : 'false');
+      showToast(value ? 'Auto-Resume enabled' : 'Auto-Resume disabled');
+    }
+  }
+
+  function clearContinueWatching() {
+    try {
+      localStorage.removeItem('movielist_history');
+      state.history = [];
+      renderContinueWatching();
+      showToast('Playback history cleared');
+    } catch (e) {
+      showToast('Failed to clear history');
+    }
+  }
+
+  function clearSearchHistory() {
+    try {
+      localStorage.removeItem('movielist_recent_searches');
+      showToast('Search history cleared');
+    } catch (e) {
+      showToast('Failed to clear search history');
+    }
   }
 
   function toggleMobileSearch(forceState) {
@@ -1313,14 +1408,21 @@
       link.classList.toggle('active', link.dataset.category === cat);
     });
 
-    // Update Mobile Bottom Dock Active State
+    // Update Google App Bottom Navigation Active State
     const dockHome = document.getElementById('dockBtnHome');
+    const dockMovies = document.getElementById('dockBtnMovies');
+    const dockSeries = document.getElementById('dockBtnSeries');
     const dockCategories = document.getElementById('dockBtnCategories');
     const dockWatchlist = document.getElementById('dockBtnWatchlist');
 
+    const isMovies = ['Hollywood 1080p', 'Bollywood', 'South Action', 'Bangla'].includes(cat);
+    const isSeries = ['TV Series', 'K-Drama', 'Animation'].includes(cat);
+
     if (dockHome) dockHome.classList.toggle('active', cat === 'All');
+    if (dockMovies) dockMovies.classList.toggle('active', isMovies);
+    if (dockSeries) dockSeries.classList.toggle('active', isSeries);
     if (dockWatchlist) dockWatchlist.classList.toggle('active', cat === 'Watchlist');
-    if (dockCategories) dockCategories.classList.toggle('active', cat !== 'All' && cat !== 'Watchlist');
+    if (dockCategories) dockCategories.classList.toggle('active', cat !== 'All' && !isMovies && !isSeries && cat !== 'Watchlist');
 
     if (cat === 'All') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2707,15 +2809,20 @@
   }
 
   function copyStreamLink(url) {
-    if (!url) return;
+    let targetUrl = url;
+    if (!targetUrl) {
+      const video = document.getElementById('cinemaVideo');
+      targetUrl = (video && video.src) || (state.activeMovie && state.activeMovie.videoUrl) || state.extSelectedUrl || '';
+    }
+    if (!targetUrl) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => {
+      navigator.clipboard.writeText(targetUrl).then(() => {
         showToast('Direct stream link copied to clipboard!');
       }).catch(() => {
-        showToast('Stream link: ' + url);
+        showToast('Stream link: ' + targetUrl);
       });
     } else {
-      showToast('Stream link: ' + url);
+      showToast('Stream link: ' + targetUrl);
     }
   }
 
@@ -2890,11 +2997,406 @@
     if (trailerModal) trailerModal.classList.remove('active');
   }
 
+  // Helper: Format seconds to HH:MM:SS or MM:SS
+  function formatTime(sec) {
+    if (!sec || isNaN(sec) || sec < 0) return '00:00';
+    const totalSec = Math.floor(sec);
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    const mStr = String(mins).padStart(2, '0');
+    const sStr = String(secs).padStart(2, '0');
+    if (hrs > 0) {
+      return `${hrs}:${mStr}:${sStr}`;
+    }
+    return `${mStr}:${sStr}`;
+  }
+
+  // Trigger Center Pulse Indicator (Play or Pause)
+  function triggerCenterPulse(isPlay) {
+    const pulse = document.getElementById('playerCenterPulse');
+    const icon = document.getElementById('centerPulseIcon');
+    if (!pulse) return;
+    if (icon) {
+      icon.setAttribute('data-lucide', isPlay ? 'play' : 'pause');
+      if (window.lucide) window.lucide.createIcons({ root: pulse });
+    }
+    pulse.classList.add('pulse-active');
+    setTimeout(() => {
+      pulse.classList.remove('pulse-active');
+    }, 380);
+  }
+
+  // Trigger Gesture Ripple on left/right double click (-10s / +10s)
+  function triggerGestureRipple(side) {
+    const ripple = document.getElementById(side === 'left' ? 'rippleLeft' : 'rippleRight');
+    if (!ripple) return;
+    ripple.classList.add('active');
+    setTimeout(() => {
+      ripple.classList.remove('active');
+    }, 450);
+  }
+
+  // Reset Auto-Hide Controls Timer
+  function resetPlayerAutoHideTimer() {
+    const cinemaBox = document.getElementById('playerCinemaBox');
+    const video = document.getElementById('cinemaVideo');
+    if (!cinemaBox) return;
+
+    cinemaBox.classList.add('controls-active');
+
+    if (state.playerControlsTimeout) {
+      clearTimeout(state.playerControlsTimeout);
+      state.playerControlsTimeout = null;
+    }
+
+    if (video && !video.paused && !video.ended) {
+      state.playerControlsTimeout = setTimeout(() => {
+        const audioPopup = document.getElementById('playerAudioPopup');
+        const speedPopup = document.getElementById('playerSpeedPopup');
+        const audioDialog = document.getElementById('playerAudioDialog');
+        const epDrawer = document.getElementById('playerEpDrawer');
+
+        const hasActivePopup = (audioPopup && audioPopup.classList.contains('active')) ||
+                               (speedPopup && speedPopup.classList.contains('active')) ||
+                               (audioDialog && audioDialog.style.display === 'block') ||
+                               (epDrawer && epDrawer.classList.contains('active'));
+
+        if (!hasActivePopup && video && !video.paused) {
+          cinemaBox.classList.remove('controls-active');
+        }
+      }, 3500);
+    }
+  }
+
+  // Render Audio Track Popup Menu Items
+  function renderAudioTrackMenuItems(tracks, activeIndex) {
+    const list = document.getElementById('playerAudioMenuList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!tracks || tracks.length === 0) {
+      const emptyBtn = document.createElement('button');
+      emptyBtn.className = 'popup-item active';
+      emptyBtn.textContent = 'Default Audio';
+      list.appendChild(emptyBtn);
+      return;
+    }
+
+    tracks.forEach((t) => {
+      const btn = document.createElement('button');
+      btn.className = `popup-item ${t.index === activeIndex ? 'active' : ''}`;
+      btn.onclick = () => selectAudioTrack(t.index);
+
+      const titleSpan = document.createElement('span');
+      titleSpan.textContent = t.label;
+      btn.appendChild(titleSpan);
+
+      if (t.index === activeIndex) {
+        const check = document.createElement('span');
+        check.style.color = 'var(--primary)';
+        check.style.fontSize = '12px';
+        check.textContent = 'Active';
+        btn.appendChild(check);
+      }
+
+      list.appendChild(btn);
+    });
+  }
+
+  function toggleAudioMenu(forceState) {
+    const popup = document.getElementById('playerAudioPopup');
+    const speedPopup = document.getElementById('playerSpeedPopup');
+    if (speedPopup) speedPopup.classList.remove('active');
+    if (!popup) return;
+    if (typeof forceState === 'boolean') {
+      popup.classList.toggle('active', forceState);
+    } else {
+      popup.classList.toggle('active');
+    }
+    resetPlayerAutoHideTimer();
+  }
+
+  function selectAudioTrack(idx) {
+    const video = document.getElementById('cinemaVideo');
+    if (!video || !window.CineBoxAudio) return;
+
+    const trackIndex = parseInt(idx, 10) || 0;
+    state.activeAudioTrackIndex = trackIndex;
+    const res = window.CineBoxAudio.setAudioTrack(trackIndex, video);
+
+    const tracks = window.CineBoxAudio.getTracks();
+    renderAudioTrackMenuItems(tracks, trackIndex);
+    toggleAudioMenu(false);
+
+    const btnLabel = document.getElementById('playerAudioBtnLabel');
+    if (btnLabel && res && res.label) {
+      btnLabel.textContent = res.language ? `Audio (${res.language})` : res.label;
+    }
+
+    if (res && res.native) {
+      showToast(`Switched to ${res.label}`);
+    } else if (tracks && tracks.length > 1 && trackIndex > 0) {
+      openAudioDialog(res.label, res.language);
+    } else {
+      showToast(`Audio Track: ${res.label}`);
+    }
+  }
+
+  function openAudioDialog(trackLabel, lang) {
+    const dialog = document.getElementById('playerAudioDialog');
+    const titleEl = document.getElementById('audioDialogTrackName');
+    const langEl = document.getElementById('audioDialogLangName');
+    if (!dialog) return;
+    if (titleEl) titleEl.textContent = `${trackLabel} Selected`;
+    if (langEl) langEl.textContent = lang ? `${lang} Audio` : trackLabel;
+    dialog.style.display = 'block';
+    if (window.lucide) window.lucide.createIcons({ root: dialog });
+  }
+
+  function closeAudioDialog() {
+    const dialog = document.getElementById('playerAudioDialog');
+    if (dialog) dialog.style.display = 'none';
+  }
+
+  function toggleSpeedMenu(forceState) {
+    const popup = document.getElementById('playerSpeedPopup');
+    const audioPopup = document.getElementById('playerAudioPopup');
+    if (audioPopup) audioPopup.classList.remove('active');
+    if (!popup) return;
+    if (typeof forceState === 'boolean') {
+      popup.classList.toggle('active', forceState);
+    } else {
+      popup.classList.toggle('active');
+    }
+    resetPlayerAutoHideTimer();
+  }
+
+  function setPlaybackSpeed(speed) {
+    const video = document.getElementById('cinemaVideo');
+    const num = parseFloat(speed);
+    if (video && !isNaN(num)) {
+      video.playbackRate = num;
+      const label = document.getElementById('playerSpeedBtnLabel');
+      if (label) label.textContent = `${num}x`;
+
+      const speedPopup = document.getElementById('playerSpeedPopup');
+      if (speedPopup) {
+        speedPopup.querySelectorAll('.popup-item').forEach((it) => {
+          it.classList.toggle('active', it.textContent.startsWith(String(num)));
+        });
+      }
+      toggleSpeedMenu(false);
+      showToast(`Playback speed set to ${num}x`);
+    }
+  }
+
+  function togglePlayPause() {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => {});
+      triggerCenterPulse(true);
+    } else {
+      video.pause();
+      triggerCenterPulse(false);
+    }
+    resetPlayerAutoHideTimer();
+  }
+
+  function seekDelta(seconds) {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    const dur = video.duration || 0;
+    const newTime = Math.max(0, Math.min(video.currentTime + seconds, dur));
+    video.currentTime = newTime;
+    triggerGestureRipple(seconds < 0 ? 'left' : 'right');
+    resetPlayerAutoHideTimer();
+  }
+
+  function toggleMute() {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    video.muted = !video.muted;
+    updateVolumeUI(video.muted ? 0 : video.volume);
+    resetPlayerAutoHideTimer();
+  }
+
+  function setVolume(val) {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    const vol = parseFloat(val);
+    video.volume = vol;
+    video.muted = (vol === 0);
+    updateVolumeUI(vol);
+    resetPlayerAutoHideTimer();
+  }
+
+  function updateVolumeUI(vol) {
+    const slider = document.getElementById('playerVolumeSlider');
+    const icon = document.getElementById('iconPlayerVolume');
+    if (slider) slider.value = vol;
+    if (icon) {
+      let iconName = 'volume-2';
+      if (vol === 0) iconName = 'volume-x';
+      else if (vol < 0.5) iconName = 'volume-1';
+      icon.setAttribute('data-lucide', iconName);
+      if (window.lucide) {
+        const wrap = document.getElementById('btnPlayerMute');
+        if (wrap) window.lucide.createIcons({ root: wrap });
+      }
+    }
+  }
+
+  function togglePiP() {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+    } else if (document.pictureInPictureEnabled) {
+      video.requestPictureInPicture().catch(() => {});
+    }
+  }
+
+  function toggleFullscreen() {
+    const cinemaBox = document.getElementById('playerCinemaBox');
+    const icon = document.getElementById('iconPlayerFullscreen');
+    if (!cinemaBox) return;
+    if (!document.fullscreenElement) {
+      if (cinemaBox.requestFullscreen) {
+        cinemaBox.requestFullscreen().catch(() => {});
+      } else if (cinemaBox.webkitRequestFullscreen) {
+        cinemaBox.webkitRequestFullscreen();
+      }
+      if (icon) icon.setAttribute('data-lucide', 'minimize');
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+      if (icon) icon.setAttribute('data-lucide', 'maximize');
+    }
+    if (window.lucide) {
+      const btn = document.getElementById('btnPlayerFullscreen');
+      if (btn) window.lucide.createIcons({ root: btn });
+    }
+  }
+
+  function setupScrubberEvents() {
+    const container = document.getElementById('playerTimelineContainer');
+    const played = document.getElementById('playerTimelinePlayed');
+    const thumb = document.getElementById('playerTimelineThumb');
+    const preview = document.getElementById('playerTimelinePreview');
+    const video = document.getElementById('cinemaVideo');
+
+    if (!container || container.dataset.bound) return;
+    container.dataset.bound = 'true';
+
+    function getRatio(e) {
+      const rect = container.getBoundingClientRect();
+      const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      return x / (rect.width || 1);
+    }
+
+    container.addEventListener('mousemove', (e) => {
+      if (!video || !video.duration) return;
+      const ratio = getRatio(e);
+      const hoverTime = ratio * video.duration;
+      if (preview) {
+        preview.textContent = formatTime(hoverTime);
+        const rect = container.getBoundingClientRect();
+        preview.style.left = `${ratio * rect.width}px`;
+        preview.classList.add('visible');
+      }
+    });
+
+    container.addEventListener('mouseleave', () => {
+      if (preview) preview.classList.remove('visible');
+    });
+
+    container.addEventListener('mousedown', (e) => {
+      if (!video || !video.duration) return;
+      state.isScrubbing = true;
+      const ratio = getRatio(e);
+      video.currentTime = ratio * video.duration;
+      if (played) played.style.width = `${ratio * 100}%`;
+      if (thumb) thumb.style.left = `${ratio * 100}%`;
+      resetPlayerAutoHideTimer();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!state.isScrubbing || !video || !video.duration) return;
+      const ratio = getRatio(e);
+      video.currentTime = ratio * video.duration;
+      if (played) played.style.width = `${ratio * 100}%`;
+      if (thumb) thumb.style.left = `${ratio * 100}%`;
+      const curEl = document.getElementById('playerCurrentTime');
+      if (curEl) curEl.textContent = formatTime(video.currentTime);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (state.isScrubbing) {
+        state.isScrubbing = false;
+        resetPlayerAutoHideTimer();
+      }
+    });
+  }
+
+  function setupViewportGestureEvents() {
+    const viewport = document.getElementById('playerVideoViewport');
+    const leftZone = document.getElementById('playerZoneLeft');
+    const rightZone = document.getElementById('playerZoneRight');
+    if (!viewport || viewport.dataset.bound) return;
+    viewport.dataset.bound = 'true';
+
+    viewport.addEventListener('click', (e) => {
+      if (e.target.closest('.player-gesture-zone') || e.target.closest('.player-audio-dialog')) return;
+      togglePlayPause();
+    });
+
+    if (leftZone) {
+      leftZone.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        seekDelta(-10);
+      });
+    }
+
+    if (rightZone) {
+      rightZone.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        seekDelta(10);
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#playerAudioAnchor')) {
+        const p = document.getElementById('playerAudioPopup');
+        if (p) p.classList.remove('active');
+      }
+      if (!e.target.closest('#playerSpeedAnchor')) {
+        const p = document.getElementById('playerSpeedPopup');
+        if (p) p.classList.remove('active');
+      }
+    });
+  }
+
   // Built-in Video Player & Ambilight Engine
   function playMovie(url, title) {
     const playerModal = document.getElementById('playerModal');
+    const cinemaBox = document.getElementById('playerCinemaBox');
     const video = document.getElementById('cinemaVideo');
     const titleEl = document.getElementById('playerTitle');
+    const qualityPill = document.getElementById('playerQualityPill');
+    const played = document.getElementById('playerTimelinePlayed');
+    const thumb = document.getElementById('playerTimelineThumb');
+    const buffered = document.getElementById('playerTimelineBuffered');
+    const currentTimeEl = document.getElementById('playerCurrentTime');
+    const durationEl = document.getElementById('playerDuration');
+    const spinner = document.getElementById('playerBufferingSpinner');
+    const playPauseIcon = document.getElementById('iconPlayerPlayPause');
+
     if (!playerModal || !video) return;
 
     if (titleEl) titleEl.textContent = title || 'Playing Media';
@@ -2915,24 +3417,38 @@
       quality: 'HD'
     };
 
+    if (qualityPill) {
+      qualityPill.textContent = currentMovie.quality || 'HD';
+    }
+
     video.src = sanitizeUrl(url);
     video.volume = 1.0;
     video.muted = false;
 
+    // Reset UI states
+    if (played) played.style.width = '0%';
+    if (thumb) thumb.style.left = '0%';
+    if (buffered) buffered.style.width = '0%';
+    if (currentTimeEl) currentTimeEl.textContent = '00:00';
+    if (durationEl) durationEl.textContent = '00:00';
+    if (playPauseIcon) {
+      playPauseIcon.setAttribute('data-lucide', 'play');
+      const btn = document.getElementById('btnPlayerPlayPause');
+      if (btn && window.lucide) window.lucide.createIcons({ root: btn });
+    }
+
     playerModal.classList.add('active');
+    if (cinemaBox) cinemaBox.classList.add('controls-active');
 
     // Populate audio track selector from detected multi-audio tracks
-    const audioSelect = document.getElementById('playerAudioTrackSelect');
-    if (audioSelect && window.CineBoxAudio) {
+    if (window.CineBoxAudio) {
       const tracks = window.CineBoxAudio.setupMediaTracks(video, currentMovie.rawTitle || title, url);
-      audioSelect.innerHTML = '';
-      tracks.forEach((t) => {
-        const opt = document.createElement('option');
-        opt.value = String(t.index);
-        opt.textContent = t.label;
-        if (t.enabled || t.index === 0) opt.selected = true;
-        audioSelect.appendChild(opt);
-      });
+      state.activeAudioTrackIndex = 0;
+      renderAudioTrackMenuItems(tracks, 0);
+      const btnLabel = document.getElementById('playerAudioBtnLabel');
+      if (btnLabel && tracks && tracks.length > 0) {
+        btnLabel.textContent = tracks[0].language ? `Audio (${tracks[0].language})` : tracks[0].label;
+      }
     }
 
     // Restore saved playback position
@@ -2942,39 +3458,84 @@
       video.currentTime = savedTime;
     }
 
-    // Save playback progress on timeupdate & update continue watching
+    // Save playback progress on timeupdate & update scrubber
     video.ontimeupdate = () => {
-      if (video.currentTime > 5) {
-        localStorage.setItem(resumeKey, String(video.currentTime));
+      const dur = video.duration || 1;
+      const cur = video.currentTime || 0;
+
+      if (!state.isScrubbing) {
+        const pct = (cur / dur) * 100;
+        if (played) played.style.width = `${pct}%`;
+        if (thumb) thumb.style.left = `${pct}%`;
+        if (currentTimeEl) currentTimeEl.textContent = formatTime(cur);
       }
-      if (video.currentTime > 10) {
-        saveWatchProgress(currentMovie, video.currentTime, video.duration);
+
+      if (cur > 5) {
+        localStorage.setItem(resumeKey, String(cur));
+      }
+      if (cur > 10) {
+        saveWatchProgress(currentMovie, cur, dur);
+      }
+    };
+
+    video.onprogress = () => {
+      if (buffered && video.duration && video.buffered.length > 0) {
+        const lastIdx = video.buffered.length - 1;
+        const end = video.buffered.end(lastIdx);
+        buffered.style.width = `${(end / video.duration) * 100}%`;
       }
     };
 
     video.onloadedmetadata = () => {
+      if (durationEl) durationEl.textContent = formatTime(video.duration);
+
       // Auto-detect discrete multi-audio tracks when supported natively by browser
-      if (window.CineBoxAudio && audioSelect) {
+      if (window.CineBoxAudio) {
         const native = window.CineBoxAudio.detectNativeAudioTracks(video);
         if (native && native.length > 1) {
-          audioSelect.innerHTML = '';
-          native.forEach((t) => {
-            const opt = document.createElement('option');
-            opt.value = String(t.index);
-            opt.textContent = t.label;
-            if (t.enabled) opt.selected = true;
-            audioSelect.appendChild(opt);
-          });
+          renderAudioTrackMenuItems(native, state.activeAudioTrackIndex);
         }
       }
     };
 
+    video.onwaiting = () => {
+      if (spinner) spinner.style.display = 'flex';
+    };
+
+    video.onseeking = () => {
+      if (spinner) spinner.style.display = 'flex';
+    };
+
+    video.onplaying = () => {
+      if (spinner) spinner.style.display = 'none';
+    };
+
+    video.onseeked = () => {
+      if (spinner) spinner.style.display = 'none';
+    };
+
+    video.oncanplay = () => {
+      if (spinner) spinner.style.display = 'none';
+    };
+
     video.onplay = () => {
+      if (playPauseIcon) {
+        playPauseIcon.setAttribute('data-lucide', 'pause');
+        const btn = document.getElementById('btnPlayerPlayPause');
+        if (btn && window.lucide) window.lucide.createIcons({ root: btn });
+      }
       startAmbilightLoop();
+      resetPlayerAutoHideTimer();
     };
 
     video.onpause = () => {
+      if (playPauseIcon) {
+        playPauseIcon.setAttribute('data-lucide', 'play');
+        const btn = document.getElementById('btnPlayerPlayPause');
+        if (btn && window.lucide) window.lucide.createIcons({ root: btn });
+      }
       stopAmbilightLoop();
+      if (cinemaBox) cinemaBox.classList.add('controls-active');
     };
 
     video.onended = () => {
@@ -2983,24 +3544,50 @@
       }
     };
 
+    // Auto-hide listeners
+    if (cinemaBox && !cinemaBox.dataset.autohideBound) {
+      cinemaBox.dataset.autohideBound = 'true';
+      cinemaBox.addEventListener('mousemove', resetPlayerAutoHideTimer);
+      cinemaBox.addEventListener('touchstart', resetPlayerAutoHideTimer, { passive: true });
+    }
+
+    // Scrubber click & drag listeners
+    setupScrubberEvents();
+
+    // Gestures and Viewport Click
+    setupViewportGestureEvents();
+
     video.play().catch(() => {
       video.muted = true;
       video.play().catch(() => {});
       showToast('Click unmute on player controls to enable sound');
     });
+
+    if (window.lucide) window.lucide.createIcons({ root: playerModal });
   }
 
   function closePlayer() {
     const playerModal = document.getElementById('playerModal');
+    const cinemaBox = document.getElementById('playerCinemaBox');
     const video = document.getElementById('cinemaVideo');
     stopAmbilightLoop();
+
+    if (state.playerControlsTimeout) {
+      clearTimeout(state.playerControlsTimeout);
+      state.playerControlsTimeout = null;
+    }
+
     if (window.CineBoxAudio) {
       window.CineBoxAudio.reset();
     }
-    const audioSelect = document.getElementById('playerAudioTrackSelect');
-    if (audioSelect) {
-      audioSelect.innerHTML = '<option value="0" selected>Audio: Default Track</option>';
+    closeAudioDialog();
+    toggleAudioMenu(false);
+    toggleSpeedMenu(false);
+
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
     }
+
     if (video) {
       video.pause();
       video.removeAttribute('src');
@@ -3064,27 +3651,6 @@
     }
   }
 
-  function setPlaybackSpeed(speed) {
-    const video = document.getElementById('cinemaVideo');
-    if (video) {
-      video.playbackRate = parseFloat(speed);
-      showToast(`Playback speed set to ${speed}x`);
-    }
-  }
-
-  function setAudioTrack(trackIndex) {
-    const video = document.getElementById('cinemaVideo');
-    if (!video || !window.CineBoxAudio) return;
-    const res = window.CineBoxAudio.setAudioTrack(trackIndex, video);
-    if (res && res.label) {
-      if (res.native) {
-        showToast(`Switched to ${res.label}`);
-      } else {
-        showToast(`Selected ${res.label}. Tip: If audio does not change in browser, use External App (VLC / MX)`);
-      }
-    }
-  }
-
   // Global Keyboard Navigation
   function setupKeybindings() {
     document.addEventListener('keydown', (e) => {
@@ -3108,21 +3674,27 @@
 
       // Player hotkeys
       if (playerModal && playerModal.classList.contains('active') && video) {
-        if (e.key === ' ' || e.key === 'k') {
+        if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
           e.preventDefault();
-          if (video.paused) video.play();
-          else video.pause();
-        } else if (e.key === 'f') {
+          togglePlayPause();
+        } else if (e.key === 'f' || e.key === 'F') {
           e.preventDefault();
-          if (document.fullscreenElement) document.exitFullscreen();
-          else video.requestFullscreen().catch(() => {});
-        } else if (e.key === 'm') {
+          toggleFullscreen();
+        } else if (e.key === 'm' || e.key === 'M') {
           e.preventDefault();
-          video.muted = !video.muted;
+          toggleMute();
         } else if (e.key === 'ArrowRight') {
-          video.currentTime += 10;
+          e.preventDefault();
+          seekDelta(10);
         } else if (e.key === 'ArrowLeft') {
-          video.currentTime -= 10;
+          e.preventDefault();
+          seekDelta(-10);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setVolume(Math.min(1, Math.round(((video.volume || 1) + 0.05) * 100) / 100));
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setVolume(Math.max(0, Math.round(((video.volume || 1) - 0.05) * 100) / 100));
         } else if (e.key === 'n' || e.key === 'N') {
           e.preventDefault();
           playNextEpisode();
@@ -3302,6 +3874,58 @@
       });
     }
 
+    // Touch Swipe Gesture for Hero Carousel
+    const heroEl = document.getElementById('heroCarousel');
+    if (heroEl) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      heroEl.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      heroEl.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          const diffX = e.changedTouches[0].clientX - touchStartX;
+          const diffY = e.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+            if (diffX < 0) nextSlide();
+            else prevSlide();
+          }
+        }
+      }, { passive: true });
+    }
+
+    // Touch Swipe-Right Gesture to Close Settings Drawer
+    const settingsPanel = document.getElementById('settingsDrawerPanel');
+    if (settingsPanel) {
+      let panelStartX = 0;
+      settingsPanel.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length > 0) {
+          panelStartX = e.touches[0].clientX;
+        }
+      }, { passive: true });
+
+      settingsPanel.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          const diffX = e.changedTouches[0].clientX - panelStartX;
+          if (diffX > 60) {
+            closeSettingsDrawer();
+          }
+        }
+      }, { passive: true });
+    }
+
+    // Keyboard ESC key dismissal for drawers and modals
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeSettingsDrawer();
+        closeCategoryDrawer();
+      }
+    });
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -3331,8 +3955,17 @@
     playMovie,
     closePlayer,
     toggleAmbilight,
+    togglePlayPause,
+    seekDelta,
+    toggleMute,
+    setVolume,
+    toggleAudioMenu,
+    selectAudioTrack,
+    closeAudioDialog,
+    toggleSpeedMenu,
     setPlaybackSpeed,
-    setAudioTrack,
+    togglePiP,
+    toggleFullscreen,
     launchVLC,
     launchMX,
     launchPotPlayer,
@@ -3349,6 +3982,12 @@
     scrollToCategories,
     focusSearch,
     toggleTheme,
+    setTheme,
+    openSettingsDrawer,
+    closeSettingsDrawer,
+    toggleSetting,
+    clearContinueWatching,
+    clearSearchHistory,
     openCategoryDrawer,
     closeCategoryDrawer,
     selectCategoryFromDrawer,

@@ -65,13 +65,18 @@
           <i data-lucide="search" style="width:18px;height:18px;"></i>
         </button>
 
-        <button class="icon-action-btn" id="themeToggleBtn" onclick="window.MovieList.toggleTheme()" title="Toggle Theme" aria-label="Toggle dark and light theme">
+        <button class="icon-action-btn desktop-only" id="themeToggleBtn" onclick="window.MovieList.toggleTheme()" title="Toggle Theme" aria-label="Toggle dark and light theme">
           <i id="themeIcon" data-lucide="sun" style="width:18px;height:18px;"></i>
         </button>
 
-        <button class="icon-action-btn" onclick="window.MovieList.setCategory('Watchlist')" title="View Watchlist" aria-label="View Watchlist">
+        <button class="icon-action-btn desktop-only" onclick="window.MovieList.setCategory('Watchlist')" title="View Watchlist" aria-label="View Watchlist">
           <i data-lucide="bookmark" style="width:18px;height:18px;"></i>
           <span class="watchlist-badge-count" id="watchlistBadge" style="display: none;">0</span>
+        </button>
+
+        <!-- Right Corner Hamburger Menu for Extra Settings (Dark/Light mode, audio boost, storage) -->
+        <button class="icon-action-btn" id="btnHamburgerMenu" onclick="window.MovieList.openSettingsDrawer()" title="Settings & Preferences" aria-label="Open settings menu">
+          <i data-lucide="menu" style="width:20px;height:20px;"></i>
         </button>
       </div>
     </header>
@@ -172,27 +177,42 @@
       </button>
     </div>
 
-    <!-- Mobile Floating Bottom Dock -->
-    <nav class="mobile-bottom-dock" aria-label="Mobile Dock Navigation">
-      <button class="mobile-dock-btn active" id="dockBtnHome" onclick="window.MovieList.setCategory('All')">
-        <i data-lucide="home" style="width:20px;height:20px;"></i>
-        <span>Home</span>
+    <!-- Google App Style Bottom Navigation for Mobile -->
+    <nav class="google-app-nav mobile-only" aria-label="Mobile Navigation">
+      <button class="google-nav-item active" id="dockBtnHome" onclick="window.MovieList.setCategory('All')" aria-label="Home">
+        <div class="google-nav-pill">
+          <i data-lucide="home" style="width:20px;height:20px;"></i>
+        </div>
+        <span class="google-nav-label">Home</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnCategories" onclick="window.MovieList.openCategoryDrawer()">
-        <i data-lucide="layers" style="width:20px;height:20px;"></i>
-        <span>Categories</span>
+
+      <button class="google-nav-item" id="dockBtnMovies" onclick="window.MovieList.setCategory('Hollywood 1080p')" aria-label="Movies">
+        <div class="google-nav-pill">
+          <i data-lucide="film" style="width:20px;height:20px;"></i>
+        </div>
+        <span class="google-nav-label">Movies</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnSearch" onclick="window.MovieList.toggleMobileSearch(true)">
-        <i data-lucide="search" style="width:20px;height:20px;"></i>
-        <span>Search</span>
+
+      <button class="google-nav-item" id="dockBtnSeries" onclick="window.MovieList.setCategory('TV Series')" aria-label="TV Shows">
+        <div class="google-nav-pill">
+          <i data-lucide="tv" style="width:20px;height:20px;"></i>
+        </div>
+        <span class="google-nav-label">TV Shows</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnWatchlist" onclick="window.MovieList.setCategory('Watchlist')">
-        <i data-lucide="bookmark" style="width:20px;height:20px;"></i>
-        <span>Watchlist</span>
+
+      <button class="google-nav-item" id="dockBtnCategories" onclick="window.MovieList.openCategoryDrawer()" aria-label="Explore Categories">
+        <div class="google-nav-pill">
+          <i data-lucide="layout-grid" style="width:20px;height:20px;"></i>
+        </div>
+        <span class="google-nav-label">Explore</span>
       </button>
-      <button class="mobile-dock-btn" id="dockBtnTheme" onclick="window.MovieList.toggleTheme()">
-        <i id="dockThemeIcon" data-lucide="sun" style="width:20px;height:20px;"></i>
-        <span>Theme</span>
+
+      <button class="google-nav-item" id="dockBtnWatchlist" onclick="window.MovieList.setCategory('Watchlist')" aria-label="Saved Watchlist">
+        <div class="google-nav-pill">
+          <i data-lucide="bookmark" style="width:20px;height:20px;"></i>
+          <span class="google-nav-badge" id="dockWatchlistBadge" style="display: none;">0</span>
+        </div>
+        <span class="google-nav-label">Watchlist</span>
       </button>
     </nav>
   </div>
@@ -543,14 +563,47 @@
 
   <!-- Built-In Video Player Modal with Dynamic Ambilight -->
   <div class="player-modal-overlay" id="playerModal" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
-    <div class="player-cinema-box">
+    <div class="player-cinema-box controls-active" id="playerCinemaBox">
       <!-- Dynamic Ambilight Canvas -->
       <canvas id="playerAmbilightCanvas" class="player-ambilight-canvas" width="64" height="36"></canvas>
 
-      <div class="player-top-header">
+      <!-- Video Viewport Area -->
+      <div class="player-video-viewport" id="playerVideoViewport">
+        <video id="cinemaVideo" class="cinema-video-el" playsinline preload="auto"></video>
+
+        <!-- Loading / Buffering Spinner -->
+        <div class="player-buffering-spinner" id="playerBufferingSpinner" style="display: none;">
+          <div class="spinner-ring"></div>
+        </div>
+
+        <!-- Center Big Play/Pause Animated Pulse Indicator -->
+        <div class="player-center-pulse" id="playerCenterPulse">
+          <i data-lucide="play" id="centerPulseIcon" style="width:34px;height:34px;"></i>
+        </div>
+
+        <!-- Gesture Zones (Double-tap/click left for -10s, right for +10s) -->
+        <div class="player-gesture-zone zone-left" id="playerZoneLeft">
+          <div class="gesture-ripple" id="rippleLeft">
+            <i data-lucide="rotate-ccw" style="width:24px;height:24px;"></i>
+            <span>-10s</span>
+          </div>
+        </div>
+        <div class="player-gesture-zone zone-right" id="playerZoneRight">
+          <div class="gesture-ripple" id="rippleRight">
+            <i data-lucide="rotate-cw" style="width:24px;height:24px;"></i>
+            <span>+10s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Header Navigation & Action Bar -->
+      <div class="player-top-header" id="playerTopHeader">
         <div class="player-title-info">
-          <i data-lucide="tv" style="width:18px;height:18px;color:var(--primary);"></i>
-          <span class="player-media-title" id="playerTitle">Playing Media</span>
+          <div class="player-title-badge">
+            <i data-lucide="film" style="width:16px;height:16px;color:var(--primary);"></i>
+            <span class="player-media-title" id="playerTitle">Playing Media</span>
+          </div>
+          <span class="player-quality-pill" id="playerQualityPill">HD</span>
         </div>
         <div class="player-controls-top-right">
           <!-- Series Episode Navigation Buttons -->
@@ -573,16 +626,6 @@
             <i data-lucide="tv" style="width:14px;height:14px;"></i>
             <span>External App</span>
           </button>
-          <select id="playerAudioTrackSelect" class="player-speed-select player-audio-select" onchange="window.MovieList.setAudioTrack(this.value)" title="Audio Track Selector" aria-label="Audio Track Selector">
-            <option value="0" selected>Audio: Default Track</option>
-          </select>
-          <select class="player-speed-select" onchange="window.MovieList.setPlaybackSpeed(this.value)" title="Playback Speed">
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1.0x (Normal)</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2.0x</option>
-          </select>
           <button class="player-pill-btn active" id="btnToggleAmbilight" onclick="window.MovieList.toggleAmbilight()" title="Toggle Ambilight Glow">
             <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
             <span>Ambilight</span>
@@ -592,7 +635,126 @@
           </button>
         </div>
       </div>
-      <video id="cinemaVideo" class="cinema-video-el" controls playsinline preload="auto"></video>
+
+      <!-- Decorated Bottom Cinema Controls Bar -->
+      <div class="player-bottom-controls" id="playerBottomControls">
+        <!-- Interactive Scrubber Timeline Bar -->
+        <div class="player-timeline-container" id="playerTimelineContainer">
+          <div class="player-timeline-preview" id="playerTimelinePreview">00:00</div>
+          <div class="player-timeline-track" id="playerTimelineTrack">
+            <div class="player-timeline-buffered" id="playerTimelineBuffered"></div>
+            <div class="player-timeline-played" id="playerTimelinePlayed"></div>
+            <div class="player-timeline-thumb" id="playerTimelineThumb"></div>
+          </div>
+        </div>
+
+        <!-- Controls Row -->
+        <div class="player-controls-row">
+          <!-- Left Section: Playback & Volume -->
+          <div class="player-controls-left">
+            <button class="player-btn-icon" id="btnPlayerPlayPause" onclick="window.MovieList.togglePlayPause()" title="Play/Pause (Space / K)" aria-label="Play or Pause">
+              <i data-lucide="play" id="iconPlayerPlayPause" style="width:18px;height:18px;"></i>
+            </button>
+            <button class="player-btn-icon" id="btnPlayerRewind10" onclick="window.MovieList.seekDelta(-10)" title="Rewind 10s (Left Arrow)" aria-label="Rewind 10 seconds">
+              <i data-lucide="rotate-ccw" style="width:17px;height:17px;"></i>
+            </button>
+            <button class="player-btn-icon" id="btnPlayerForward10" onclick="window.MovieList.seekDelta(10)" title="Forward 10s (Right Arrow)" aria-label="Forward 10 seconds">
+              <i data-lucide="rotate-cw" style="width:17px;height:17px;"></i>
+            </button>
+
+            <!-- Volume Control Group -->
+            <div class="player-volume-group">
+              <button class="player-btn-icon" id="btnPlayerMute" onclick="window.MovieList.toggleMute()" title="Mute/Unmute (M)" aria-label="Mute or Unmute">
+                <i data-lucide="volume-2" id="iconPlayerVolume" style="width:18px;height:18px;"></i>
+              </button>
+              <div class="player-volume-slider-wrap">
+                <input type="range" class="player-volume-slider" id="playerVolumeSlider" min="0" max="1" step="0.05" value="1" oninput="window.MovieList.setVolume(this.value)" aria-label="Volume Slider">
+              </div>
+            </div>
+
+            <!-- Time Display -->
+            <div class="player-time-badge" id="playerTimeBadge">
+              <span id="playerCurrentTime">00:00</span>
+              <span class="time-sep">/</span>
+              <span id="playerDuration">00:00</span>
+            </div>
+          </div>
+
+          <!-- Right Section: Audio Tracks, Speed, Fullscreen -->
+          <div class="player-controls-right">
+            <!-- Audio Track Dropdown & Popover -->
+            <div class="player-menu-anchor" id="playerAudioAnchor">
+              <button class="player-menu-btn" id="btnPlayerAudioMenu" onclick="window.MovieList.toggleAudioMenu()" title="Audio Tracks" aria-label="Select Audio Track">
+                <i data-lucide="headphones" style="width:14px;height:14px;color:var(--primary);"></i>
+                <span id="playerAudioBtnLabel">Audio Track</span>
+                <i data-lucide="chevron-up" style="width:12px;height:12px;opacity:0.7;"></i>
+              </button>
+              <div class="player-popup-menu" id="playerAudioPopup">
+                <div class="popup-menu-header">Audio Tracks</div>
+                <div class="popup-menu-items" id="playerAudioMenuList"></div>
+              </div>
+            </div>
+
+            <!-- Playback Speed Dropdown & Popover -->
+            <div class="player-menu-anchor" id="playerSpeedAnchor">
+              <button class="player-menu-btn" id="btnPlayerSpeedMenu" onclick="window.MovieList.toggleSpeedMenu()" title="Playback Speed" aria-label="Select Playback Speed">
+                <i data-lucide="gauge" style="width:14px;height:14px;color:var(--accent);"></i>
+                <span id="playerSpeedBtnLabel">1.0x</span>
+                <i data-lucide="chevron-up" style="width:12px;height:12px;opacity:0.7;"></i>
+              </button>
+              <div class="player-popup-menu" id="playerSpeedPopup">
+                <div class="popup-menu-header">Playback Speed</div>
+                <div class="popup-menu-items">
+                  <button class="popup-item" onclick="window.MovieList.setPlaybackSpeed(0.5)">0.5x</button>
+                  <button class="popup-item" onclick="window.MovieList.setPlaybackSpeed(0.75)">0.75x</button>
+                  <button class="popup-item active" onclick="window.MovieList.setPlaybackSpeed(1)">1.0x (Normal)</button>
+                  <button class="popup-item" onclick="window.MovieList.setPlaybackSpeed(1.25)">1.25x</button>
+                  <button class="popup-item" onclick="window.MovieList.setPlaybackSpeed(1.5)">1.5x</button>
+                  <button class="popup-item" onclick="window.MovieList.setPlaybackSpeed(2)">2.0x</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Picture-in-Picture Button -->
+            <button class="player-btn-icon" id="btnPlayerPiP" onclick="window.MovieList.togglePiP()" title="Picture in Picture" aria-label="Picture in Picture">
+              <i data-lucide="picture-in-picture-2" style="width:17px;height:17px;"></i>
+            </button>
+
+            <!-- Fullscreen Button -->
+            <button class="player-btn-icon" id="btnPlayerFullscreen" onclick="window.MovieList.toggleFullscreen()" title="Toggle Fullscreen (F)" aria-label="Toggle Fullscreen">
+              <i data-lucide="maximize" id="iconPlayerFullscreen" style="width:17px;height:17px;"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Player Audio Switcher Dialog / Modal -->
+      <div class="player-audio-dialog" id="playerAudioDialog" style="display: none;">
+        <div class="audio-dialog-card">
+          <div class="audio-dialog-header">
+            <div class="audio-dialog-badge">
+              <i data-lucide="headphones" style="width:18px;height:18px;color:var(--primary);"></i>
+              <span id="audioDialogTrackName">English Audio Selected</span>
+            </div>
+            <button class="audio-dialog-close" onclick="window.MovieList.closeAudioDialog()" aria-label="Close dialog">
+              <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+          </div>
+          <p class="audio-dialog-desc">
+            Browsers decode the primary track of MKV media by default. To listen in <strong id="audioDialogLangName">English Audio</strong> with full multi-channel surround sound:
+          </p>
+          <div class="audio-dialog-actions">
+            <button class="btn-audio-action btn-audio-vlc" onclick="window.MovieList.openExternalFromPlayer()">
+              <i data-lucide="tv" style="width:16px;height:16px;"></i>
+              <span>Play in External App (VLC / MX Player)</span>
+            </button>
+            <button class="btn-audio-action btn-audio-copy" onclick="window.MovieList.copyStreamLink()">
+              <i data-lucide="copy" style="width:16px;height:16px;"></i>
+              <span>Copy Direct Stream Link</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- In-Player Quick Episode Drawer -->
       <div class="player-ep-drawer" id="playerEpDrawer">
@@ -707,6 +869,144 @@
           </div>
           <span class="drawer-cat-name">Saved Watchlist</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings & Preferences Drawer (Slides in from Right Corner) -->
+  <div class="settings-drawer-overlay" id="settingsDrawerOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" style="display: none;" onclick="if(event.target === this) window.MovieList.closeSettingsDrawer()">
+    <div class="settings-drawer-panel" id="settingsDrawerPanel">
+      <!-- Drawer Header -->
+      <div class="settings-drawer-header">
+        <div class="settings-drawer-title-group">
+          <div class="settings-header-icon-wrap">
+            <i data-lucide="settings" style="width:20px;height:20px;color:var(--primary);"></i>
+          </div>
+          <div>
+            <h3 class="settings-drawer-title" id="settingsDrawerTitle">Settings & Preferences</h3>
+            <span class="settings-drawer-subtitle">Display, audio & library options</span>
+          </div>
+        </div>
+        <button class="settings-close-btn" onclick="window.MovieList.closeSettingsDrawer()" aria-label="Close settings">
+          <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+      </div>
+
+      <!-- Drawer Scrollable Body -->
+      <div class="settings-drawer-body">
+        <!-- Appearance / Theme Group -->
+        <div class="settings-group">
+          <div class="settings-group-title">
+            <i data-lucide="palette" style="width:16px;height:16px;"></i>
+            <span>Appearance & Theme</span>
+          </div>
+          <div class="settings-card">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Interface Theme</span>
+              <span class="settings-row-desc">Switch between dark cinema and bright mode</span>
+            </div>
+            <div class="settings-segment-row">
+              <button class="settings-segment-btn" id="themeSegmentDark" onclick="window.MovieList.setTheme('dark')">
+                <i data-lucide="moon" style="width:15px;height:15px;"></i>
+                <span>Dark Cinema</span>
+              </button>
+              <button class="settings-segment-btn" id="themeSegmentLight" onclick="window.MovieList.setTheme('light')">
+                <i data-lucide="sun" style="width:15px;height:15px;"></i>
+                <span>Light Mode</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audio & Playback Options -->
+        <div class="settings-group">
+          <div class="settings-group-title">
+            <i data-lucide="volume-2" style="width:16px;height:16px;"></i>
+            <span>Audio & Playback</span>
+          </div>
+          <div class="settings-card">
+            <div class="settings-item-row">
+              <div class="settings-row-info">
+                <span class="settings-row-label">Volume Booster (300%)</span>
+                <span class="settings-row-desc">Web Audio DSP preamp for low-volume streams</span>
+              </div>
+              <label class="settings-toggle-switch">
+                <input type="checkbox" id="settingVolumeBooster" onchange="window.MovieList.toggleSetting('volumeBooster', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item-divider"></div>
+            <div class="settings-item-row">
+              <div class="settings-row-info">
+                <span class="settings-row-label">Auto-Resume Playback</span>
+                <span class="settings-row-desc">Resume video from last watched position</span>
+              </div>
+              <label class="settings-toggle-switch">
+                <input type="checkbox" id="settingAutoResume" checked onchange="window.MovieList.toggleSetting('autoResume', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Library & History Management -->
+        <div class="settings-group">
+          <div class="settings-group-title">
+            <i data-lucide="database" style="width:16px;height:16px;"></i>
+            <span>Storage & History</span>
+          </div>
+          <div class="settings-card">
+            <button class="settings-action-row" onclick="window.MovieList.clearContinueWatching()">
+              <div class="settings-row-left">
+                <i data-lucide="history" style="width:18px;height:18px;color:var(--accent);"></i>
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Clear Continue Watching</span>
+                  <span class="settings-row-desc">Remove all playback progress</span>
+                </div>
+              </div>
+              <i data-lucide="trash-2" style="width:16px;height:16px;color:var(--text-muted);"></i>
+            </button>
+            <div class="settings-item-divider"></div>
+            <button class="settings-action-row" onclick="window.MovieList.clearSearchHistory()">
+              <div class="settings-row-left">
+                <i data-lucide="search" style="width:18px;height:18px;color:var(--primary);"></i>
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Clear Search History</span>
+                  <span class="settings-row-desc">Reset recent searches cache</span>
+                </div>
+              </div>
+              <i data-lucide="rotate-ccw" style="width:16px;height:16px;color:var(--text-muted);"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Server & Connection Status -->
+        <div class="settings-group">
+          <div class="settings-group-title">
+            <i data-lucide="wifi" style="width:16px;height:16px;"></i>
+            <span>Network & Server</span>
+          </div>
+          <div class="settings-card">
+            <div class="settings-item-row">
+              <div class="settings-row-info">
+                <span class="settings-row-label">Primary BDIX Node</span>
+                <span class="settings-row-desc">172.16.50.14 (DhakaFlix)</span>
+              </div>
+              <span class="server-status-pill online">
+                <span class="status-dot"></span>
+                <span>Online</span>
+              </span>
+            </div>
+            <div class="settings-item-divider"></div>
+            <div class="settings-item-row">
+              <div class="settings-row-info">
+                <span class="settings-row-label">Platform Version</span>
+                <span class="settings-row-desc">MovieList Cinema v1.2</span>
+              </div>
+              <span class="version-tag">PWA Ready</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
