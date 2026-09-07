@@ -35,7 +35,8 @@
     currentSeasonName: '',
     currentSelectedSeasonIdx: 0,
     currentPlayingEpisodeIdx: -1,
-    episodeFilterQuery: ''
+    episodeFilterQuery: '',
+    gridRenderLimit: 48
   };
 
   // Safe DOM Sanitizers
@@ -419,6 +420,17 @@
 
   // Full Library Background Loader (Includes all TV Series like Game of Thrones & all movies)
   let fullLibraryLoadingPromise = null;
+  let bgRenderDebounceTimer = null;
+
+  function scheduleBackgroundFilterRender() {
+    clearTimeout(bgRenderDebounceTimer);
+    bgRenderDebounceTimer = setTimeout(() => {
+      if (state.searchQuery || state.activeCategory !== 'All') {
+        filterAndRenderGrid(false);
+      }
+    }, 280);
+  }
+
   function loadFullLibraryInBackground() {
     if (state.allCatalogLoaded || fullLibraryLoadingPromise) {
       return fullLibraryLoadingPromise || Promise.resolve();
@@ -452,9 +464,7 @@
                   state.allMovies.push(m);
                 }
               });
-              if (state.searchQuery || state.activeCategory === item.key) {
-                filterAndRenderGrid();
-              }
+              scheduleBackgroundFilterRender();
             }
           }
         } catch (e) {
@@ -462,6 +472,7 @@
         }
       }
       state.allCatalogLoaded = true;
+      scheduleBackgroundFilterRender();
     })();
 
     return fullLibraryLoadingPromise;
@@ -774,7 +785,10 @@
     filterAndRenderGrid();
   }
 
+  const GRID_PAGE_SIZE = 48;
+
   function setSearch(query) {
+    const prev = state.searchQuery;
     state.searchQuery = (query || '').trim().toLowerCase();
 
     // Ensure full library is being loaded so Game of Thrones and all titles are matched
@@ -791,17 +805,24 @@
     const clearBtn = document.getElementById('mobileSearchClearBtn');
     if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
 
-    filterAndRenderGrid();
+    if (prev !== state.searchQuery) {
+      filterAndRenderGrid(true);
+    }
   }
 
   function setSort(sortBy) {
     state.sortBy = sortBy;
-    filterAndRenderGrid();
+    filterAndRenderGrid(true);
   }
 
-  // Shared Movie Card HTML Generator
+  // Shared Movie Card HTML Generator with Inline Clean SVGs (Superfast 0ms rendering)
   function renderMovieCardHtml(m) {
     const isWatchlisted = state.watchlist.has(m.videoUrl);
+    const tvSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>`;
+    const bookmarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="${isWatchlisted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
+    const playSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
+    const starSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+
     return `
       <div class="movie-card" onclick="window.MovieList.openDetails('${escapeQuotes(m.id)}')">
         <div class="card-poster-wrap">
@@ -811,19 +832,19 @@
                     onclick="window.MovieList.onCardExtClick('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
                     title="Play in External App (VLC / MX Player)" 
                     aria-label="Play in External App">
-              <i data-lucide="tv" style="width:14px;height:14px;"></i>
+              ${tvSvg}
             </button>
             <button class="card-icon-action card-watchlist-btn ${isWatchlisted ? 'active' : ''}" 
                     onclick="window.MovieList.toggleWatchlist('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
-                    title="Save to Watchlist"
+                    title="Save to Watchlist" 
                     aria-label="Save to Watchlist">
-              <i data-lucide="bookmark" style="width:14px;height:14px;${isWatchlisted ? 'fill:currentColor;' : ''}"></i>
+              ${bookmarkSvg}
             </button>
           </div>
           <img class="card-poster-img" src="${sanitizeUrl(m.posterUrl)}" alt="${escapeQuotes(m.title)}" loading="lazy" onerror="this.src='icons/icon-512.png'">
           <div class="card-play-overlay">
             <div class="card-play-icon">
-              <i data-lucide="play" style="width:20px;height:20px;fill:currentColor;"></i>
+              ${playSvg}
             </div>
           </div>
         </div>
@@ -835,7 +856,7 @@
               ${m.year ? `<span>• ${escapeHtml(m.year)}</span>` : ''}
             </div>
             <span style="display:inline-flex;align-items:center;gap:3px;font-weight:700;color:var(--accent-gold);">
-              <i data-lucide="star" style="width:12px;height:12px;fill:var(--accent-gold);"></i>
+              ${starSvg}
               ${escapeHtml(m.rating)}
             </span>
           </div>
@@ -872,7 +893,9 @@
       if (!items || items.length === 0) return;
 
       const sliderId = `rowSlider_${catIdx}`;
-      const rowCardsHtml = items.map((m) => renderMovieCardHtml(m)).join('');
+      // Display top 24 in horizontal slider to prevent DOM explosion and keep fluid 60fps
+      const displayItems = items.slice(0, 24);
+      const rowCardsHtml = displayItems.map((m) => renderMovieCardHtml(m)).join('');
       const showAllHtml = renderShowAllCardHtml(catConfig.key, catConfig.name, items.length);
 
       html += `
@@ -911,11 +934,16 @@
     }
   }
 
-  function filterAndRenderGrid() {
+  function filterAndRenderGrid(resetLimit = true) {
+    if (resetLimit) {
+      state.gridRenderLimit = GRID_PAGE_SIZE;
+    }
+
     const categoryRowsContainer = document.getElementById('categoryRowsContainer');
     const catalogHeaderRow = document.getElementById('catalogHeaderRow');
     const moviesGrid = document.getElementById('moviesGrid');
     const catalogTitleText = document.getElementById('catalogSectionTitleText');
+    const paginationWrapper = document.getElementById('gridPaginationWrapper');
 
     const isHomeView = state.activeCategory === 'All' && !state.searchQuery;
 
@@ -926,6 +954,7 @@
       }
       if (catalogHeaderRow) catalogHeaderRow.style.display = 'none';
       if (moviesGrid) moviesGrid.style.display = 'none';
+      if (paginationWrapper) paginationWrapper.style.display = 'none';
       return;
     }
 
@@ -952,23 +981,60 @@
     }
 
     if (state.searchQuery) {
-      const q = state.searchQuery;
-      list = list.filter((m) => {
-        return (
-          m.title.toLowerCase().includes(q) ||
-          (m.year && m.year.includes(q)) ||
-          m.category.toLowerCase().includes(q)
-        );
-      });
-      if (catalogTitleText) catalogTitleText.textContent = `Search: "${state.searchQuery}"`;
+      const rawQ = state.searchQuery.trim().toLowerCase();
+      const tokens = rawQ.split(/[\s_.-]+/).filter(Boolean);
+
+      if (rawQ.length === 1) {
+        // Single character: only match titles starting with this letter (prevents 16,000 matches)
+        list = list.filter((m) => m.title.toLowerCase().startsWith(rawQ));
+      } else if (tokens.length > 0) {
+        const scored = [];
+        for (let i = 0; i < list.length; i++) {
+          const m = list[i];
+          const t = m.title.toLowerCase();
+          let score = 0;
+
+          if (t === rawQ) {
+            score = 1000;
+          } else if (t.startsWith(rawQ)) {
+            score = 800 - Math.min(200, t.length - rawQ.length);
+          } else if (t.includes(rawQ)) {
+            score = 600 - Math.min(200, t.indexOf(rawQ));
+          } else {
+            let matches = 0;
+            for (let j = 0; j < tokens.length; j++) {
+              if (t.includes(tokens[j])) matches++;
+            }
+            if (matches === tokens.length) {
+              score = 400 + matches * 20;
+            } else if (tokens.length > 1 && matches >= 1) {
+              score = 200 + matches * 20;
+            }
+          }
+
+          if (score > 0) {
+            scored.push({ movie: m, score });
+          }
+        }
+
+        // Sort by relevance score descending
+        scored.sort((a, b) => b.score - a.score);
+        list = scored.map((s) => s.movie);
+      }
+
+      if (catalogTitleText) {
+        catalogTitleText.textContent = `Search: "${state.searchQuery}"`;
+      }
     }
 
-    if (state.sortBy === 'rating') {
-      list.sort((a, b) => parseFloat(b.rating || 0) - parseFloat(a.rating || 0));
-    } else if (state.sortBy === 'year') {
-      list.sort((a, b) => parseInt(b.year || 0, 10) - parseInt(a.year || 0, 10));
-    } else if (state.sortBy === 'title') {
-      list.sort((a, b) => a.title.localeCompare(b.title));
+    if (!state.searchQuery) {
+      if (state.sortBy === 'rating') {
+        list.sort((a, b) => parseFloat(b.rating || 0) - parseFloat(a.rating || 0));
+      } else if (state.sortBy === 'year') {
+        list.sort((a, b) => parseInt(b.year || 0, 10) - parseInt(a.year || 0, 10));
+      } else if (state.sortBy === 'title') {
+        list.sort((a, b) => a.title.localeCompare(b.title));
+      }
     }
 
     state.filteredMovies = list;
@@ -978,13 +1044,17 @@
   function renderGrid() {
     const grid = document.getElementById('moviesGrid');
     const badge = document.getElementById('catalogCountBadge');
+    const paginationWrapper = document.getElementById('gridPaginationWrapper');
+    const paginationStatus = document.getElementById('gridPaginationStatus');
+    const btnLoadMore = document.getElementById('btnLoadMore');
     if (!grid) return;
 
+    const total = state.filteredMovies.length;
     if (badge) {
-      badge.textContent = `${state.filteredMovies.length} Titles`;
+      badge.textContent = `${total.toLocaleString()} Titles`;
     }
 
-    if (state.filteredMovies.length === 0) {
+    if (total === 0) {
       grid.innerHTML = `
         <div class="empty-state-card">
           <div class="empty-state-icon">
@@ -992,16 +1062,45 @@
           </div>
           <h3 style="font-size:18px;font-weight:700;">No movies found</h3>
           <p style="color:var(--text-secondary);font-size:13.5px;max-width:320px;">
-            ${state.activeCategory === 'Watchlist' ? 'Your watchlist is empty. Save movies by clicking the bookmark icon!' : 'Try searching for another movie title or select a different category.'}
+            ${state.activeCategory === 'Watchlist' ? 'Your watchlist is empty. Save movies by clicking the bookmark icon!' : 'Try searching with fewer words or another keyword.'}
           </p>
         </div>
       `;
+      if (paginationWrapper) paginationWrapper.style.display = 'none';
       if (window.lucide) window.lucide.createIcons({ root: grid });
       return;
     }
 
-    grid.innerHTML = state.filteredMovies.map((m) => renderMovieCardHtml(m)).join('');
-    if (window.lucide) window.lucide.createIcons({ root: grid });
+    const countToShow = Math.min(total, state.gridRenderLimit || GRID_PAGE_SIZE);
+    const visibleMovies = state.filteredMovies.slice(0, countToShow);
+
+    grid.innerHTML = visibleMovies.map((m) => renderMovieCardHtml(m)).join('');
+
+    if (paginationWrapper) {
+      if (total > countToShow) {
+        paginationWrapper.style.display = 'flex';
+        if (paginationStatus) {
+          paginationStatus.textContent = `Showing ${countToShow} of ${total.toLocaleString()} Titles`;
+        }
+        if (btnLoadMore) {
+          btnLoadMore.style.display = 'inline-flex';
+        }
+      } else {
+        if (total > GRID_PAGE_SIZE && paginationStatus) {
+          paginationWrapper.style.display = 'flex';
+          paginationStatus.textContent = `All ${total.toLocaleString()} Titles Loaded`;
+          if (btnLoadMore) btnLoadMore.style.display = 'none';
+        } else {
+          paginationWrapper.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  function loadMoreGrid() {
+    if (!state.filteredMovies || state.gridRenderLimit >= state.filteredMovies.length) return;
+    state.gridRenderLimit = (state.gridRenderLimit || GRID_PAGE_SIZE) + GRID_PAGE_SIZE;
+    renderGrid();
   }
 
   // Movie Details Modal Component
@@ -2033,6 +2132,32 @@
     });
   }
 
+  let gridScrollDebounce = null;
+  function setupInfiniteScroll() {
+    window.addEventListener(
+      'scroll',
+      () => {
+        const isHomeView = state.activeCategory === 'All' && !state.searchQuery;
+        if (isHomeView) return;
+        if (gridScrollDebounce) return;
+
+        gridScrollDebounce = setTimeout(() => {
+          gridScrollDebounce = null;
+          if (!state.filteredMovies || state.gridRenderLimit >= state.filteredMovies.length) return;
+
+          const scrollHeight = document.documentElement.scrollHeight;
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const clientHeight = window.innerHeight || document.documentElement.clientHeight;
+
+          if (scrollTop + clientHeight >= scrollHeight - 600) {
+            loadMoreGrid();
+          }
+        }, 120);
+      },
+      { passive: true }
+    );
+  }
+
   // Initialization
   function init() {
     initTheme();
@@ -2040,15 +2165,21 @@
     loadCatalog();
     setupKeybindings();
     updateDesktopVlcUi();
+    setupInfiniteScroll();
 
     const searchInput = document.getElementById('searchInput');
     let searchDebounce = null;
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         clearTimeout(searchDebounce);
+        const val = e.target.value;
+        if (!val) {
+          setSearch('');
+          return;
+        }
         searchDebounce = setTimeout(() => {
-          setSearch(e.target.value);
-        }, 150);
+          setSearch(val);
+        }, 220);
       });
     }
 
@@ -2057,9 +2188,14 @@
     if (mobileSearchInput) {
       mobileSearchInput.addEventListener('input', (e) => {
         clearTimeout(mobileSearchDebounce);
+        const val = e.target.value;
+        if (!val) {
+          setSearch('');
+          return;
+        }
         mobileSearchDebounce = setTimeout(() => {
-          setSearch(e.target.value);
-        }, 150);
+          setSearch(val);
+        }, 220);
       });
     }
 
@@ -2161,7 +2297,8 @@
     playPrevEpisode,
     togglePlayerEpDrawer,
     downloadSeasonM3u,
-    exportSeasonLinksTxt
+    exportSeasonLinksTxt,
+    loadMoreGrid
   };
 
   if (document.readyState === 'loading') {

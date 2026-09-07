@@ -164,6 +164,15 @@
     <!-- Movie Grid (Visible in Grid / Search / Category View) -->
     <main class="movies-grid-container" id="moviesGrid" style="display: none;"></main>
 
+    <!-- Grid Pagination & Load More Container -->
+    <div class="grid-pagination-wrapper" id="gridPaginationWrapper" style="display: none;">
+      <span class="grid-pagination-status" id="gridPaginationStatus">Showing 48 Titles</span>
+      <button class="btn-load-more" id="btnLoadMore" onclick="window.MovieList.loadMoreGrid()" aria-label="Load More Titles">
+        <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
+        <span id="loadMoreText">Load More Titles</span>
+      </button>
+    </div>
+
     <!-- Mobile Floating Bottom Dock -->
     <nav class="mobile-bottom-dock" aria-label="Mobile Dock Navigation">
       <button class="mobile-dock-btn active" id="dockBtnHome" onclick="window.MovieList.setCategory('All')">
