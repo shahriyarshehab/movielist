@@ -38,13 +38,13 @@
 
       <!-- Desktop Nav Pills -->
       <nav class="nav-menu" aria-label="Primary Navigation">
-        <button class="nav-link active" data-category="All" onclick="window.MovieList.setCategory('All')">Home</button>
-        <button class="nav-link" data-category="Hollywood 1080p" onclick="window.MovieList.setCategory('Hollywood 1080p')">Hollywood</button>
-        <button class="nav-link" data-category="Bollywood" onclick="window.MovieList.setCategory('Bollywood')">Bollywood</button>
-        <button class="nav-link" data-category="TV Series" onclick="window.MovieList.setCategory('TV Series')">TV Shows</button>
-        <button class="nav-link" data-category="K-Drama" onclick="window.MovieList.setCategory('K-Drama')">K-Drama</button>
-        <button class="nav-link" data-category="Animation" onclick="window.MovieList.setCategory('Animation')">Animation</button>
-        <button class="nav-link" data-category="Watchlist" onclick="window.MovieList.setCategory('Watchlist')">Watchlist</button>
+        <button class="nav-link active" data-category="All" onclick="window.MovieList.setCategory(this.dataset.category)">Home</button>
+        <button class="nav-link" data-category="Hollywood 1080p" onclick="window.MovieList.setCategory(this.dataset.category)">Hollywood</button>
+        <button class="nav-link" data-category="Bollywood" onclick="window.MovieList.setCategory(this.dataset.category)">Bollywood</button>
+        <button class="nav-link" data-category="TV Series" onclick="window.MovieList.setCategory(this.dataset.category)">TV Shows</button>
+        <button class="nav-link" data-category="K-Drama" onclick="window.MovieList.setCategory(this.dataset.category)">K-Drama</button>
+        <button class="nav-link" data-category="Animation" onclick="window.MovieList.setCategory(this.dataset.category)">Animation</button>
+        <button class="nav-link" data-category="Watchlist" onclick="window.MovieList.setCategory(this.dataset.category)">Watchlist</button>
       </nav>
 
       <!-- Header Search & Controls -->
@@ -119,17 +119,17 @@
     <!-- Filtering & Category Shelf -->
     <section class="controls-section">
       <div class="category-pills-row" id="categoryPillsRow">
-        <button class="category-pill active" data-category="All" onclick="window.MovieList.setCategory('All')">All Titles</button>
-        <button class="category-pill" data-category="Today's Updates" onclick="window.MovieList.setCategory('Today\'s Updates')">Today's Updates</button>
-        <button class="category-pill" data-category="Top Rated" onclick="window.MovieList.setCategory('Top Rated')">Top Rated</button>
-        <button class="category-pill" data-category="Hollywood 1080p" onclick="window.MovieList.setCategory('Hollywood 1080p')">Hollywood</button>
-        <button class="category-pill" data-category="Bollywood" onclick="window.MovieList.setCategory('Bollywood')">Bollywood</button>
-        <button class="category-pill" data-category="South Action" onclick="window.MovieList.setCategory('South Action')">South Action</button>
-        <button class="category-pill" data-category="K-Drama" onclick="window.MovieList.setCategory('K-Drama')">K-Drama</button>
-        <button class="category-pill" data-category="TV Series" onclick="window.MovieList.setCategory('TV Series')">TV Series</button>
-        <button class="category-pill" data-category="Animation" onclick="window.MovieList.setCategory('Animation')">Animation</button>
-        <button class="category-pill" data-category="Bangla" onclick="window.MovieList.setCategory('Bangla')">Bangla</button>
-        <button class="category-pill" data-category="Watchlist" onclick="window.MovieList.setCategory('Watchlist')">Saved Watchlist</button>
+        <button class="category-pill active" data-category="All" onclick="window.MovieList.setCategory(this.dataset.category)">All Titles</button>
+        <button class="category-pill" data-category="Today's Updates" onclick="window.MovieList.setCategory(this.dataset.category)">Today's Updates</button>
+        <button class="category-pill" data-category="Top Rated" onclick="window.MovieList.setCategory(this.dataset.category)">Top Rated</button>
+        <button class="category-pill" data-category="Hollywood 1080p" onclick="window.MovieList.setCategory(this.dataset.category)">Hollywood</button>
+        <button class="category-pill" data-category="Bollywood" onclick="window.MovieList.setCategory(this.dataset.category)">Bollywood</button>
+        <button class="category-pill" data-category="South Action" onclick="window.MovieList.setCategory(this.dataset.category)">South Action</button>
+        <button class="category-pill" data-category="K-Drama" onclick="window.MovieList.setCategory(this.dataset.category)">K-Drama</button>
+        <button class="category-pill" data-category="TV Series" onclick="window.MovieList.setCategory(this.dataset.category)">TV Series</button>
+        <button class="category-pill" data-category="Animation" onclick="window.MovieList.setCategory(this.dataset.category)">Animation</button>
+        <button class="category-pill" data-category="Bangla" onclick="window.MovieList.setCategory(this.dataset.category)">Bangla</button>
+        <button class="category-pill" data-category="Watchlist" onclick="window.MovieList.setCategory(this.dataset.category)">Saved Watchlist</button>
       </div>
 
       <div class="sort-select-wrapper">
@@ -624,7 +624,7 @@
   </div>
 
   <!-- Dedicated Mobile Category Bottom Sheet Drawer -->
-  <div class="drawer-overlay" id="categoryDrawerOverlay" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="drawer-overlay" id="categoryDrawerOverlay" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" style="display: none;">
     <div class="category-drawer-sheet">
       <div class="drawer-grab-handle"></div>
       <div class="drawer-header">
@@ -638,67 +638,67 @@
       </div>
 
       <div class="drawer-categories-grid">
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('All')">
+        <button class="drawer-cat-btn" data-category="All" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-all">
             <i data-lucide="film" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">All Titles</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Today\'s Updates')">
+        <button class="drawer-cat-btn" data-category="Today's Updates" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-today">
             <i data-lucide="sparkles" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Today's Updates</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Top Rated')">
+        <button class="drawer-cat-btn" data-category="Top Rated" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-top">
             <i data-lucide="star" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">IMDb Top 250</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Hollywood 1080p')">
+        <button class="drawer-cat-btn" data-category="Hollywood 1080p" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-hollywood">
             <i data-lucide="globe" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Hollywood 1080p</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Bollywood')">
+        <button class="drawer-cat-btn" data-category="Bollywood" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-bollywood">
             <i data-lucide="music" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Bollywood (Hindi)</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('South Action')">
+        <button class="drawer-cat-btn" data-category="South Action" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-south">
             <i data-lucide="zap" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">South Action</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('TV Series')">
+        <button class="drawer-cat-btn" data-category="TV Series" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-tv">
             <i data-lucide="tv" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">TV & Web Series</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('K-Drama')">
+        <button class="drawer-cat-btn" data-category="K-Drama" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-kdrama">
             <i data-lucide="heart" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Korean Drama</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Animation')">
+        <button class="drawer-cat-btn" data-category="Animation" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-anime">
             <i data-lucide="smile" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Animation & Anime</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Bangla')">
+        <button class="drawer-cat-btn" data-category="Bangla" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-bangla">
             <i data-lucide="clapperboard" style="width:20px;height:20px;"></i>
           </div>
           <span class="drawer-cat-name">Bangla Cinema</span>
         </button>
-        <button class="drawer-cat-btn" onclick="window.MovieList.selectCategoryFromDrawer('Watchlist')">
+        <button class="drawer-cat-btn" data-category="Watchlist" onclick="window.MovieList.selectCategoryFromDrawer(this.dataset.category)">
           <div class="drawer-cat-icon icon-watchlist">
             <i data-lucide="bookmark" style="width:20px;height:20px;"></i>
           </div>

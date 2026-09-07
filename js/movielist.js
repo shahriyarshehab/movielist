@@ -12,6 +12,7 @@
     filteredMovies: [],
     carouselMovies: [],
     categories: {},
+    moviesMap: new Map(),
     activeCategory: 'All',
     searchQuery: '',
     searchActiveDropdownIdx: -1,
@@ -38,6 +39,86 @@
     gridRenderLimit: 48,
     lastBrowseScrollY: 0
   };
+
+  let movieSequenceId = 0;
+
+  function registerMovie(m) {
+    if (!m) return;
+    if (!state.moviesMap) state.moviesMap = new Map();
+    if (m.uid) state.moviesMap.set(m.uid, m);
+    if (m.id) state.moviesMap.set(String(m.id), m);
+    if (m.videoUrl) state.moviesMap.set(String(m.videoUrl), m);
+    if (m.rawTitle) state.moviesMap.set(String(m.rawTitle), m);
+  }
+
+  function findMovieById(id) {
+    if (!id) return null;
+    const key = String(id).trim();
+
+    // 1. Direct Map lookup
+    if (state.moviesMap && state.moviesMap.has(key)) {
+      return state.moviesMap.get(key);
+    }
+
+    // 2. Try URI decoding
+    try {
+      const decoded = decodeURIComponent(key);
+      if (state.moviesMap && state.moviesMap.has(decoded)) {
+        return state.moviesMap.get(decoded);
+      }
+    } catch (e) {}
+
+    // 3. Check filtered movies (currently on screen in grid)
+    if (Array.isArray(state.filteredMovies)) {
+      const m = state.filteredMovies.find(
+        (it) => it.uid === key || String(it.id) === key || it.videoUrl === key || it.rawTitle === key || it.title === key
+      );
+      if (m) return m;
+    }
+
+    // 4. Check all movies
+    if (Array.isArray(state.allMovies)) {
+      const m = state.allMovies.find(
+        (it) => it.uid === key || String(it.id) === key || it.videoUrl === key || it.rawTitle === key || it.title === key
+      );
+      if (m) return m;
+    }
+
+    // 5. Check carousel movies
+    if (Array.isArray(state.carouselMovies)) {
+      const m = state.carouselMovies.find(
+        (it) => it.uid === key || String(it.id) === key || it.videoUrl === key || it.rawTitle === key || it.title === key
+      );
+      if (m) return m;
+    }
+
+    // 6. Check all categories
+    if (state.categories && typeof state.categories === 'object') {
+      for (const catList of Object.values(state.categories)) {
+        if (Array.isArray(catList)) {
+          const m = catList.find(
+            (it) => it.uid === key || String(it.id) === key || it.videoUrl === key || it.rawTitle === key || it.title === key
+          );
+          if (m) return m;
+        }
+      }
+    }
+
+    // 7. Case-insensitive title match fallback
+    const lower = key.toLowerCase();
+    const allPool = [
+      ...(state.filteredMovies || []),
+      ...(state.allMovies || []),
+      ...(state.carouselMovies || [])
+    ];
+    return (
+      allPool.find(
+        (m) =>
+          (m.title && m.title.toLowerCase() === lower) ||
+          (m.rawTitle && m.rawTitle.toLowerCase() === lower)
+      ) || null
+    );
+  }
 
   // Safe DOM Sanitizers
   function escapeHtml(str) {
@@ -125,17 +206,30 @@
     }
   }
 
-  function toggleWatchlist(movieUrl, movieTitle, event) {
+  function toggleWatchlist(movieUrlOrUid, movieTitle, event) {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
-    if (state.watchlist.has(movieUrl)) {
-      state.watchlist.delete(movieUrl);
-      showToast(`Removed "${movieTitle}" from Watchlist`);
+    let url = movieUrlOrUid;
+    let title = movieTitle || '';
+
+    if (!url || !url.startsWith('http')) {
+      const movie = findMovieById(movieUrlOrUid);
+      if (movie) {
+        url = movie.videoUrl;
+        title = movie.title;
+      }
+    }
+
+    if (!url) return;
+
+    if (state.watchlist.has(url)) {
+      state.watchlist.delete(url);
+      showToast(`Removed "${title || 'Movie'}" from Watchlist`);
     } else {
-      state.watchlist.add(movieUrl);
-      showToast(`Added "${movieTitle}" to Watchlist`);
+      state.watchlist.add(url);
+      showToast(`Added "${title || 'Movie'}" to Watchlist`);
     }
     try {
       localStorage.setItem('movielist_watchlist', JSON.stringify([...state.watchlist]));
@@ -144,6 +238,16 @@
     updateWatchlistBadge();
     renderGrid();
     updateModalWatchlistState();
+  }
+
+  function toggleWatchlistFromCard(uid, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const movie = findMovieById(uid);
+    if (!movie) return;
+    toggleWatchlist(movie.videoUrl, movie.title, event);
   }
 
   function updateWatchlistBadge() {
@@ -360,7 +464,9 @@
     else if (/game of thrones/i.test(rawTitle)) rating = '9.2';
     else if (/breaking bad/i.test(rawTitle)) rating = '9.5';
 
-    return {
+    const uid = `mov_${++movieSequenceId}`;
+    const movieObj = {
+      uid,
       id: videoUrl || rawTitle,
       rawTitle,
       title,
@@ -374,6 +480,8 @@
       size,
       date
     };
+    registerMovie(movieObj);
+    return movieObj;
   }
 
   // Ultra-Fast Parallel Separated Category Loader for Instant Home Render
@@ -389,8 +497,10 @@
             const mapped = items.map((item) => mapItem(item, key));
             state.categories[key] = mapped;
             mapped.forEach((m) => {
-              if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
-                seenCatalogUrls.add(m.videoUrl);
+              registerMovie(m);
+              const trackKey = m.videoUrl || m.id || m.rawTitle;
+              if (trackKey && !seenCatalogUrls.has(trackKey)) {
+                seenCatalogUrls.add(trackKey);
                 state.allMovies.push(m);
               }
             });
@@ -459,8 +569,10 @@
               const mapped = list.map((entry) => mapItem(entry, item.key));
               state.categories[item.key] = mapped;
               mapped.forEach((m) => {
-                if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
-                  seenCatalogUrls.add(m.videoUrl);
+                registerMovie(m);
+                const trackKey = m.videoUrl || m.id || m.rawTitle;
+                if (trackKey && !seenCatalogUrls.has(trackKey)) {
+                  seenCatalogUrls.add(trackKey);
                   state.allMovies.push(m);
                 }
               });
@@ -507,7 +619,13 @@
   }
 
   async function ensureCategoryLoaded(catKey) {
-    if (!catKey || catKey === 'All' || catKey === 'Watchlist' || loadedCategories.has(catKey)) return;
+    if (!catKey || catKey === 'All' || catKey === 'Watchlist') return;
+    if (loadedCategories.has(catKey)) {
+      if (state.activeCategory === catKey) {
+        filterAndRenderGrid();
+      }
+      return;
+    }
     const file = CATEGORY_JSON_MAP[catKey];
     if (!file) return;
 
@@ -521,8 +639,10 @@
         state.categories[catKey] = mapped;
 
         mapped.forEach((m) => {
-          if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
-            seenCatalogUrls.add(m.videoUrl);
+          registerMovie(m);
+          const trackKey = m.videoUrl || m.id || m.rawTitle;
+          if (trackKey && !seenCatalogUrls.has(trackKey)) {
+            seenCatalogUrls.add(trackKey);
             state.allMovies.push(m);
           }
         });
@@ -537,35 +657,40 @@
   }
 
   function processCatalogData(data) {
-    const all = [];
+    if (!state.categories) state.categories = {};
 
-    if (Array.isArray(data.carousel)) {
+    if (Array.isArray(data.carousel) && data.carousel.length > 0) {
       state.carouselMovies = data.carousel.map((item) => mapItem(item, 'Featured'));
       state.carouselMovies.forEach((m) => {
-        if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
-          seenCatalogUrls.add(m.videoUrl);
-          all.push(m);
+        registerMovie(m);
+        const trackKey = m.videoUrl || m.id || m.rawTitle;
+        if (trackKey && !seenCatalogUrls.has(trackKey)) {
+          seenCatalogUrls.add(trackKey);
+          state.allMovies.push(m);
         }
       });
     }
 
     if (data.categories && typeof data.categories === 'object') {
-      state.categories = {};
       for (const [catName, items] of Object.entries(data.categories)) {
-        if (Array.isArray(items)) {
+        if (Array.isArray(items) && items.length > 0) {
           const mapped = items.map((item) => mapItem(item, catName));
-          state.categories[catName] = mapped;
           mapped.forEach((m) => {
-            if (m.videoUrl && !seenCatalogUrls.has(m.videoUrl)) {
-              seenCatalogUrls.add(m.videoUrl);
-              all.push(m);
+            registerMovie(m);
+            const trackKey = m.videoUrl || m.id || m.rawTitle;
+            if (trackKey && !seenCatalogUrls.has(trackKey)) {
+              seenCatalogUrls.add(trackKey);
+              state.allMovies.push(m);
             }
           });
+          // Do not overwrite category if already populated with separated category items
+          if (!state.categories[catName] || state.categories[catName].length === 0) {
+            state.categories[catName] = mapped;
+          }
         }
       }
     }
 
-    state.allMovies = all;
     renderHeroCarousel();
     filterAndRenderGrid();
     loadHistory();
@@ -648,11 +773,11 @@
                   <i data-lucide="film" style="width:16px;height:16px;"></i>
                   Trailer
                 </button>
-                <button class="btn-glass" onclick="window.MovieList.openDetails('${escapeQuotes(movie.id)}')">
+                <button class="btn-glass" onclick="window.MovieList.openDetails('${movie.uid}')">
                   <i data-lucide="info" style="width:16px;height:16px;"></i>
                   Details
                 </button>
-                <button class="icon-action-btn ${isWatchlisted ? 'active' : ''}" onclick="window.MovieList.toggleWatchlist('${escapeQuotes(movie.videoUrl)}', '${escapeQuotes(movie.title)}', event)" title="Watchlist">
+                <button class="icon-action-btn ${isWatchlisted ? 'active' : ''}" onclick="window.MovieList.toggleWatchlistFromCard('${movie.uid}', event)" title="Watchlist">
                   <i data-lucide="bookmark" style="width:18px;height:18px;${isWatchlisted ? 'fill:var(--accent);color:var(--accent);' : ''}"></i>
                 </button>
               </div>
@@ -705,6 +830,8 @@
   function openCategoryDrawer() {
     const drawer = document.getElementById('categoryDrawerOverlay');
     if (drawer) {
+      drawer.style.display = 'flex';
+      void drawer.offsetHeight; // Force reflow for smooth animation
       drawer.classList.add('active');
       if (window.lucide) window.lucide.createIcons({ root: drawer });
     }
@@ -712,7 +839,14 @@
 
   function closeCategoryDrawer() {
     const drawer = document.getElementById('categoryDrawerOverlay');
-    if (drawer) drawer.classList.remove('active');
+    if (drawer) {
+      drawer.classList.remove('active');
+      setTimeout(() => {
+        if (!drawer.classList.contains('active')) {
+          drawer.style.display = 'none';
+        }
+      }, 320);
+    }
   }
 
   function selectCategoryFromDrawer(cat) {
@@ -1165,7 +1299,13 @@
 
   // Filtering, Searching & Sorting
   function setCategory(cat) {
-    state.activeCategory = cat;
+    if (document.body.classList.contains('details-open')) {
+      closeDetails(false);
+    }
+    closeCategoryDrawer();
+    toggleMobileSearch(false);
+
+    state.activeCategory = cat || 'All';
     document.querySelectorAll('.category-pill').forEach((pill) => {
       pill.classList.toggle('active', pill.dataset.category === cat);
     });
@@ -1223,25 +1363,29 @@
 
   // Shared Movie Card HTML Generator with Inline Clean SVGs (Superfast 0ms rendering)
   function renderMovieCardHtml(m) {
+    registerMovie(m);
     const isWatchlisted = state.watchlist.has(m.videoUrl);
+    const safeUid = m.uid || `mov_${m.id}`;
     const tvSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>`;
     const bookmarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="${isWatchlisted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
     const playSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
     const starSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
 
     return `
-      <div class="movie-card" onclick="window.MovieList.openDetails('${escapeQuotes(m.id)}')">
+      <div class="movie-card" data-movie-uid="${safeUid}" onclick="window.MovieList.openDetails('${safeUid}')">
         <div class="card-poster-wrap">
           <span class="card-badge-top-left">${escapeHtml(m.quality)}</span>
           <div class="card-actions-top-right">
             <button class="card-icon-action card-ext-btn" 
-                    onclick="window.MovieList.onCardExtClick('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
+                    data-movie-uid="${safeUid}"
+                    onclick="window.MovieList.onCardExtClick('${safeUid}', event)" 
                     title="Play in External App (VLC / MX Player)" 
                     aria-label="Play in External App">
               ${tvSvg}
             </button>
             <button class="card-icon-action card-watchlist-btn ${isWatchlisted ? 'active' : ''}" 
-                    onclick="window.MovieList.toggleWatchlist('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', event)" 
+                    data-movie-uid="${safeUid}"
+                    onclick="window.MovieList.toggleWatchlistFromCard('${safeUid}', event)" 
                     title="Save to Watchlist" 
                     aria-label="Save to Watchlist">
               ${bookmarkSvg}
@@ -1274,7 +1418,7 @@
   // "Show All" Card at End of Category Row
   function renderShowAllCardHtml(catKey, catName, count) {
     return `
-      <div class="movie-card show-all-card" onclick="window.MovieList.setCategory('${escapeQuotes(catKey)}')">
+      <div class="movie-card show-all-card" data-category="${escapeQuotes(catKey)}" onclick="window.MovieList.setCategory(this.dataset.category)">
         <div class="show-all-card-inner">
           <div class="show-all-glow-orb"></div>
           <div class="show-all-icon-circle">
@@ -1307,7 +1451,7 @@
       html += `
         <div class="category-row-block">
           <div class="row-header">
-            <div class="row-title-wrap" onclick="window.MovieList.setCategory('${escapeQuotes(catConfig.key)}')">
+            <div class="row-title-wrap" data-category="${escapeQuotes(catConfig.key)}" onclick="window.MovieList.setCategory(this.dataset.category)">
               <h2 class="row-heading">${escapeHtml(catConfig.name)}</h2>
               <span class="row-badge">${items.length} Titles</span>
             </div>
@@ -1471,7 +1615,7 @@
 
   // Movie Details Full Page Component
   function openDetails(id, pushHistory = true) {
-    const movie = state.allMovies.find((m) => m.id === id) || state.carouselMovies.find((m) => m.id === id);
+    const movie = findMovieById(id);
     if (!movie) return;
 
     state.activeMovie = movie;
@@ -2224,7 +2368,7 @@
         .map((s, idx) => {
           const sName = s[0];
           return `
-            <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" onclick="window.MovieList.selectIndexedSeason(${idx}, '${escapeQuotes(sName)}')">
+            <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" data-season-idx="${idx}" data-season-name="${escapeQuotes(sName)}" onclick="window.MovieList.selectIndexedSeason(${idx}, this.dataset.seasonName)">
               ${escapeHtml(sName)}
             </button>
           `;
@@ -2352,7 +2496,7 @@
               <button class="ep-icon-btn ep-btn-stream" onclick="window.MovieList.playSpecificEpisode(${originalIdx})" title="Stream Episode">
                 <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i>
               </button>
-              <button class="ep-icon-btn ep-btn-ext" onclick="window.MovieList.openExternalPlayerModal('${escapeQuotes(ep.url)}', '${escapeQuotes(state.currentSeasonName + ' - ' + cleanName)}', event)" title="Play in VLC / MX Player">
+              <button class="ep-icon-btn ep-btn-ext" onclick="window.MovieList.openExternalPlayerFromEpisode(${originalIdx}, event)" title="Play in VLC / MX Player">
                 <i data-lucide="tv" style="width:14px;height:14px;"></i>
               </button>
               <a class="ep-icon-btn ep-btn-download" href="${sanitizeUrl(ep.url)}" download title="Direct Download" target="_blank" rel="noopener">
@@ -2365,6 +2509,18 @@
       .join('');
 
     if (window.lucide) window.lucide.createIcons({ root: epContainer });
+  }
+
+  function openExternalPlayerFromEpisode(epIdx, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const ep = state.currentSeasonEpisodes && state.currentSeasonEpisodes[epIdx];
+    if (!ep) return;
+    const cleanName = cleanEpisodeTitle(ep.name);
+    const title = (state.currentSeasonName ? state.currentSeasonName + ' - ' : '') + cleanName;
+    openExternalPlayerModal(ep.url, title, event);
   }
 
   function filterEpisodes(query) {
@@ -2607,11 +2763,37 @@
     if (modal) modal.classList.remove('active');
   }
 
-  function onCardExtClick(url, title, event) {
+  function onCardExtClick(targetOrUrl, titleOrEvent, maybeEvent) {
+    let url = '';
+    let title = '';
+    let event = null;
+
+    if (titleOrEvent && typeof titleOrEvent === 'object' && titleOrEvent.preventDefault) {
+      event = titleOrEvent;
+      const movie = findMovieById(targetOrUrl);
+      url = movie ? movie.videoUrl : targetOrUrl;
+      title = movie ? movie.title : '';
+    } else {
+      url = targetOrUrl;
+      title = typeof titleOrEvent === 'string' ? titleOrEvent : '';
+      event = maybeEvent;
+    }
+
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
+
+    if (!url || !url.startsWith('http')) {
+      const movie = findMovieById(targetOrUrl);
+      if (movie) {
+        url = movie.videoUrl;
+        title = movie.title;
+      }
+    }
+
+    if (!url) return;
+
     if (state.defaultPlayer) {
       const playerLabels = { vlc: 'VLC Player', mx: 'MX Player', pot: 'PotPlayer' };
       const label = playerLabels[state.defaultPlayer] || state.defaultPlayer.toUpperCase();
@@ -3084,6 +3266,9 @@
     },
     slideRow,
     toggleWatchlist,
+    toggleWatchlistFromCard,
+    openExternalPlayerFromEpisode,
+    findMovieById,
     removeHistory,
     openDetails,
     closeDetails,

@@ -3360,18 +3360,21 @@ body.details-open {
   background: rgba(4, 6, 12, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  display: flex;
+  display: none;
   align-items: flex-end;
   justify-content: center;
   z-index: 999;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s var(--ease-spring);
+  visibility: hidden;
+  transition: opacity 0.3s var(--ease-spring), visibility 0.3s ease;
 }
 
 .drawer-overlay.active {
+  display: flex;
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
 }
 
 .category-drawer-sheet {

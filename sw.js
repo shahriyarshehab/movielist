@@ -1,4 +1,4 @@
-const CACHE_NAME = 'movielist-v9';
+const CACHE_NAME = 'movielist-v10';
 const STATIC_ASSETS = [
   './',
   './index.html',
