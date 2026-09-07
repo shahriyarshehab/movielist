@@ -50,11 +50,13 @@
       <!-- Header Search & Controls -->
       <div class="header-actions">
         <!-- Desktop Search Pill -->
-        <div class="search-pill-wrapper desktop-only">
-          <input type="text" id="searchInput" class="search-input" placeholder="Search movies, series..." aria-label="Search movies">
-          <button class="search-icon-btn" aria-label="Submit search">
+        <div class="search-pill-wrapper desktop-only" id="desktopSearchWrap">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search movies, series..." aria-label="Search movies" autocomplete="off">
+          <button class="search-icon-btn" aria-label="Submit search" onclick="window.MovieList.viewAllSearchResults(document.getElementById('searchInput').value)">
             <i data-lucide="search" style="width:16px;height:16px;"></i>
           </button>
+          <!-- Live Desktop Search Dropdown List -->
+          <div class="search-live-dropdown" id="searchLiveDropdown" style="display: none;"></div>
         </div>
 
         <!-- Computer Auto-Open VLC Toggle Button -->
@@ -82,12 +84,14 @@
     <!-- Expandable Mobile App Search Bar -->
     <div class="mobile-search-overlay-bar" id="mobileSearchBar" style="display: none;">
       <div class="mobile-search-inner">
-        <i data-lucide="search" style="width:18px;height:18px;color:var(--primary);"></i>
-        <input type="text" id="mobileSearchInput" class="mobile-search-input-field" placeholder="Search movies, series, anime..." aria-label="Search">
+        <i data-lucide="search" style="width:18px;height:18px;color:var(--primary);cursor:pointer;" onclick="window.MovieList.viewAllSearchResults(document.getElementById('mobileSearchInput').value)" title="Submit Search"></i>
+        <input type="text" id="mobileSearchInput" class="mobile-search-input-field" placeholder="Search movies, series, anime..." aria-label="Search" autocomplete="off">
         <button class="mobile-search-close-btn" onclick="window.MovieList.toggleMobileSearch(false)" aria-label="Close search">
           <i data-lucide="x" style="width:18px;height:18px;"></i>
         </button>
       </div>
+      <!-- Live Mobile Search Dropdown List -->
+      <div class="mobile-search-live-dropdown" id="mobileSearchLiveDropdown" style="display: none;"></div>
     </div>
 
     <!-- Hero Featured Carousel -->

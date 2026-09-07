@@ -14,6 +14,8 @@
     categories: {},
     activeCategory: 'All',
     searchQuery: '',
+    searchActiveDropdownIdx: -1,
+    currentDropdownItems: [],
     sortBy: 'default',
     currentSlideIdx: 0,
     slideInterval: null,
@@ -722,10 +724,22 @@
     if (!bar) return;
     const shouldOpen = typeof forceState === 'boolean' ? forceState : !bar.classList.contains('active');
     bar.classList.toggle('active', shouldOpen);
-    if (shouldOpen && input) {
-      setTimeout(() => input.focus(), 150);
-    } else if (!shouldOpen && input) {
-      input.blur();
+    bar.style.display = shouldOpen ? 'block' : 'none';
+    if (shouldOpen) {
+      if (input) {
+        setTimeout(() => {
+          input.focus();
+          const val = (input.value || '').trim();
+          if (val.length >= 2) {
+            renderLiveSearchResults(val);
+          } else {
+            showRecentOrPopularDropdown();
+          }
+        }, 150);
+      }
+    } else {
+      if (input) input.blur();
+      hideSearchDropdown();
     }
   }
 
@@ -735,6 +749,396 @@
     if (mobileInput) mobileInput.value = '';
     if (searchInput) searchInput.value = '';
     setSearch('');
+    showRecentOrPopularDropdown();
+  }
+
+  // Live Search Suggestions & Auto-Complete Engine
+  const POPULAR_SEARCH_TERMS = [
+    'Game of Thrones',
+    'Breaking Bad',
+    'The Dark Knight',
+    'Stranger Things',
+    'Chernobyl',
+    'Top Rated',
+    'Animation',
+    '4K UHD'
+  ];
+
+  const RECENT_SEARCHES_KEY = 'movielist_recent_searches';
+  const MAX_RECENT_SEARCHES = 8;
+
+  function getRecentSearches() {
+    try {
+      const data = localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecentSearch(rawQuery) {
+    if (!rawQuery) return;
+    const term = String(rawQuery).trim();
+    if (!term || term.length < 2) return;
+
+    try {
+      let list = getRecentSearches();
+      list = list.filter((item) => item.toLowerCase() !== term.toLowerCase());
+      list.unshift(term);
+      if (list.length > MAX_RECENT_SEARCHES) {
+        list = list.slice(0, MAX_RECENT_SEARCHES);
+      }
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+
+  function removeRecentSearch(term, e) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    try {
+      let list = getRecentSearches();
+      list = list.filter((item) => item.toLowerCase() !== String(term).toLowerCase());
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list));
+      showRecentOrPopularDropdown();
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  function clearRecentSearches(e) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    try {
+      localStorage.removeItem(RECENT_SEARCHES_KEY);
+      showRecentOrPopularDropdown();
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  function scoreSearchMatches(rawQuery, sourceList) {
+    if (!rawQuery || !sourceList || !sourceList.length) return [];
+    const rawQ = String(rawQuery).trim().toLowerCase();
+    if (!rawQ) return [];
+
+    const tokens = rawQ.split(/[\s_.-]+/).filter(Boolean);
+
+    if (rawQ.length === 1) {
+      return sourceList.filter((m) => m && m.title && m.title.toLowerCase().startsWith(rawQ));
+    }
+
+    if (tokens.length === 0) return [];
+
+    const scored = [];
+    const len = sourceList.length;
+    for (let i = 0; i < len; i++) {
+      const m = sourceList[i];
+      if (!m || !m.title) continue;
+      const t = m.title.toLowerCase();
+      let score = 0;
+
+      if (t === rawQ) {
+        score = 1000;
+      } else if (t.startsWith(rawQ)) {
+        score = 800 - Math.min(200, t.length - rawQ.length);
+      } else if (t.includes(rawQ)) {
+        score = 600 - Math.min(200, t.indexOf(rawQ));
+      } else {
+        let matches = 0;
+        for (let j = 0; j < tokens.length; j++) {
+          if (t.includes(tokens[j])) matches++;
+        }
+        if (matches === tokens.length) {
+          score = 400 + matches * 20;
+        } else if (tokens.length > 1 && matches >= 1) {
+          score = 200 + matches * 20;
+        }
+      }
+
+      if (score > 0) {
+        scored.push({ movie: m, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.movie);
+  }
+
+  function getActiveDropdownContainers() {
+    return {
+      desktopDropdown: document.getElementById('searchLiveDropdown'),
+      mobileDropdown: document.getElementById('mobileSearchLiveDropdown')
+    };
+  }
+
+  function renderToActiveDropdown(html) {
+    const isMobile = window.innerWidth <= 768;
+    const { desktopDropdown, mobileDropdown } = getActiveDropdownContainers();
+    const target = isMobile ? mobileDropdown : desktopDropdown;
+    const other = isMobile ? desktopDropdown : mobileDropdown;
+    if (other) {
+      other.style.display = 'none';
+      other.innerHTML = '';
+    }
+    if (target) {
+      target.innerHTML = html;
+      target.style.display = 'block';
+    }
+  }
+
+  function hideSearchDropdown() {
+    state.searchActiveDropdownIdx = -1;
+    state.currentDropdownItems = [];
+    const { desktopDropdown, mobileDropdown } = getActiveDropdownContainers();
+    if (desktopDropdown) {
+      desktopDropdown.style.display = 'none';
+      desktopDropdown.innerHTML = '';
+    }
+    if (mobileDropdown) {
+      mobileDropdown.style.display = 'none';
+      mobileDropdown.innerHTML = '';
+    }
+  }
+
+  function showRecentOrPopularDropdown() {
+    const recent = getRecentSearches();
+    state.searchActiveDropdownIdx = -1;
+    state.currentDropdownItems = [];
+
+    let html = '';
+
+    if (recent.length > 0) {
+      html += `
+        <div class="search-dropdown-header">
+          <span>Recent Searches</span>
+          <button class="search-dropdown-clear-btn" onclick="window.MovieList.clearRecentSearches(event)">Clear</button>
+        </div>
+        <div class="search-tags-container">
+          ${recent
+            .map(
+              (term) => `
+            <span class="search-tag-chip" onclick="window.MovieList.fillAndSearch('${escapeQuotes(term)}')">
+              <span>${escapeHtml(term)}</span>
+              <span class="search-tag-chip-remove" onclick="window.MovieList.removeRecentSearch('${escapeQuotes(term)}', event)" title="Remove">&times;</span>
+            </span>
+          `
+            )
+            .join('')}
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="search-dropdown-header">
+        <span>Popular Suggestions</span>
+      </div>
+      <div class="search-tags-container">
+        ${POPULAR_SEARCH_TERMS.map(
+          (term) => `
+          <span class="search-tag-chip" onclick="window.MovieList.fillAndSearch('${escapeQuotes(term)}')">
+            <span>${escapeHtml(term)}</span>
+          </span>
+        `
+        ).join('')}
+      </div>
+    `;
+
+    renderToActiveDropdown(html);
+  }
+
+  function renderLiveSearchResults(rawQuery) {
+    const trimmed = (rawQuery || '').trim();
+    if (trimmed.length < 2) {
+      showRecentOrPopularDropdown();
+      return;
+    }
+
+    if (!state.allCatalogLoaded) {
+      loadFullLibraryInBackground();
+    }
+
+    const matched = scoreSearchMatches(trimmed, state.allMovies);
+    const totalMatches = matched.length;
+    const topMatches = matched.slice(0, 7);
+
+    state.currentDropdownItems = topMatches;
+    state.searchActiveDropdownIdx = -1;
+
+    if (totalMatches === 0) {
+      renderToActiveDropdown(`
+        <div class="search-dropdown-empty">
+          No matches found for "${escapeHtml(trimmed)}"
+        </div>
+      `);
+      return;
+    }
+
+    const starSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+    const playSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
+
+    const itemsHtml = topMatches
+      .map((m, idx) => {
+        return `
+          <div class="search-dropdown-item" 
+               data-dropdown-idx="${idx}"
+               onclick="window.MovieList.selectSearchItem('${escapeQuotes(m.id)}', '${escapeQuotes(trimmed)}')">
+            <img class="search-dropdown-poster" 
+                 src="${sanitizeUrl(m.posterUrl)}" 
+                 alt="${escapeQuotes(m.title)}" 
+                 loading="lazy" 
+                 onerror="this.src='icons/icon-512.png'">
+            <div class="search-dropdown-info">
+              <div class="search-dropdown-title">${escapeHtml(m.title)}</div>
+              <div class="search-dropdown-meta">
+                <span class="search-dropdown-quality">${escapeHtml(m.quality)}</span>
+                <span>${escapeHtml(m.category)}</span>
+                ${m.year ? `<span>• ${escapeHtml(m.year)}</span>` : ''}
+                <span class="search-dropdown-rating">${starSvg} ${escapeHtml(m.rating)}</span>
+              </div>
+            </div>
+            <div class="search-dropdown-actions">
+              <button class="search-dropdown-play-btn" 
+                      title="Play Now" 
+                      aria-label="Play Now"
+                      onclick="window.MovieList.selectPlaySearchItem('${escapeQuotes(m.videoUrl)}', '${escapeQuotes(m.title)}', '${escapeQuotes(trimmed)}', event)">
+                ${playSvg}
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    const footerHtml = `
+      <div class="search-dropdown-footer" onclick="window.MovieList.viewAllSearchResults('${escapeQuotes(trimmed)}')">
+        <span>View all ${totalMatches.toLocaleString()} results in catalog</span>
+        <span>&rarr;</span>
+      </div>
+    `;
+
+    renderToActiveDropdown(`
+      <div class="search-dropdown-header">
+        <span>Matching Titles (${totalMatches.toLocaleString()})</span>
+      </div>
+      <div class="search-dropdown-list">
+        ${itemsHtml}
+      </div>
+      ${footerHtml}
+    `);
+  }
+
+  function selectSearchItem(id, query) {
+    saveRecentSearch(query);
+    hideSearchDropdown();
+    if (window.innerWidth <= 768) {
+      toggleMobileSearch(false);
+    }
+    openDetails(id);
+  }
+
+  function selectPlaySearchItem(url, title, query, event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    saveRecentSearch(query);
+    hideSearchDropdown();
+    if (window.innerWidth <= 768) {
+      toggleMobileSearch(false);
+    }
+    playMovie(url, title);
+  }
+
+  function scrollToCatalog() {
+    const target = document.getElementById('catalogHeaderRow') || document.getElementById('moviesGrid');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function viewAllSearchResults(query) {
+    const term = (query || '').trim();
+    if (!term) return;
+    saveRecentSearch(term);
+    hideSearchDropdown();
+    if (window.innerWidth <= 768) {
+      toggleMobileSearch(false);
+    }
+    setSearch(term);
+    scrollToCatalog();
+  }
+
+  function fillAndSearch(term) {
+    const mainInput = document.getElementById('searchInput');
+    const mobileInput = document.getElementById('mobileSearchInput');
+    if (mainInput) mainInput.value = term;
+    if (mobileInput) mobileInput.value = term;
+    viewAllSearchResults(term);
+  }
+
+  function handleDropdownKeyNav(e, inputEl) {
+    const isMobile = window.innerWidth <= 768;
+    const { desktopDropdown, mobileDropdown } = getActiveDropdownContainers();
+    const targetDropdown = isMobile ? mobileDropdown : desktopDropdown;
+
+    if (!targetDropdown || targetDropdown.style.display === 'none') {
+      if (e.key === 'Enter') {
+        const val = (inputEl.value || '').trim();
+        if (val) {
+          viewAllSearchResults(val);
+        }
+      }
+      return;
+    }
+
+    const items = targetDropdown.querySelectorAll('.search-dropdown-item');
+    const count = items.length;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (count === 0) return;
+      state.searchActiveDropdownIdx = (state.searchActiveDropdownIdx + 1) % count;
+      updateDropdownSelection(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (count === 0) return;
+      state.searchActiveDropdownIdx = (state.searchActiveDropdownIdx - 1 + count) % count;
+      updateDropdownSelection(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.searchActiveDropdownIdx >= 0 && state.searchActiveDropdownIdx < state.currentDropdownItems.length) {
+        const selected = state.currentDropdownItems[state.searchActiveDropdownIdx];
+        selectSearchItem(selected.id, inputEl.value);
+      } else {
+        const val = (inputEl.value || '').trim();
+        if (val) {
+          viewAllSearchResults(val);
+        } else {
+          hideSearchDropdown();
+        }
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hideSearchDropdown();
+    }
+  }
+
+  function updateDropdownSelection(items) {
+    items.forEach((item, idx) => {
+      const isSelected = idx === state.searchActiveDropdownIdx;
+      item.classList.toggle('selected', isSelected);
+      if (isSelected) {
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
   }
 
   function scrollToCategories() {
@@ -981,47 +1385,7 @@
     }
 
     if (state.searchQuery) {
-      const rawQ = state.searchQuery.trim().toLowerCase();
-      const tokens = rawQ.split(/[\s_.-]+/).filter(Boolean);
-
-      if (rawQ.length === 1) {
-        // Single character: only match titles starting with this letter (prevents 16,000 matches)
-        list = list.filter((m) => m.title.toLowerCase().startsWith(rawQ));
-      } else if (tokens.length > 0) {
-        const scored = [];
-        for (let i = 0; i < list.length; i++) {
-          const m = list[i];
-          const t = m.title.toLowerCase();
-          let score = 0;
-
-          if (t === rawQ) {
-            score = 1000;
-          } else if (t.startsWith(rawQ)) {
-            score = 800 - Math.min(200, t.length - rawQ.length);
-          } else if (t.includes(rawQ)) {
-            score = 600 - Math.min(200, t.indexOf(rawQ));
-          } else {
-            let matches = 0;
-            for (let j = 0; j < tokens.length; j++) {
-              if (t.includes(tokens[j])) matches++;
-            }
-            if (matches === tokens.length) {
-              score = 400 + matches * 20;
-            } else if (tokens.length > 1 && matches >= 1) {
-              score = 200 + matches * 20;
-            }
-          }
-
-          if (score > 0) {
-            scored.push({ movie: m, score });
-          }
-        }
-
-        // Sort by relevance score descending
-        scored.sort((a, b) => b.score - a.score);
-        list = scored.map((s) => s.movie);
-      }
-
+      list = scoreSearchMatches(state.searchQuery, list);
       if (catalogTitleText) {
         catalogTitleText.textContent = `Search: "${state.searchQuery}"`;
       }
@@ -2167,37 +2531,76 @@
     updateDesktopVlcUi();
     setupInfiniteScroll();
 
-    const searchInput = document.getElementById('searchInput');
-    let searchDebounce = null;
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchDebounce);
-        const val = e.target.value;
-        if (!val) {
-          setSearch('');
-          return;
-        }
-        searchDebounce = setTimeout(() => {
-          setSearch(val);
-        }, 220);
-      });
-    }
+    const setupSearchInput = (inputEl) => {
+      if (!inputEl) return;
+      let debounce = null;
+      let gridDebounce = null;
 
-    const mobileSearchInput = document.getElementById('mobileSearchInput');
-    let mobileSearchDebounce = null;
-    if (mobileSearchInput) {
-      mobileSearchInput.addEventListener('input', (e) => {
-        clearTimeout(mobileSearchDebounce);
+      inputEl.addEventListener('focus', () => {
+        const val = (inputEl.value || '').trim();
+        if (val.length >= 2) {
+          renderLiveSearchResults(val);
+        } else {
+          showRecentOrPopularDropdown();
+        }
+      });
+
+      inputEl.addEventListener('input', (e) => {
+        clearTimeout(debounce);
+        clearTimeout(gridDebounce);
         const val = e.target.value;
+
+        // Sync other search input if present
+        const otherInput =
+          inputEl.id === 'searchInput'
+            ? document.getElementById('mobileSearchInput')
+            : document.getElementById('searchInput');
+        if (otherInput && otherInput.value !== val) {
+          otherInput.value = val;
+        }
+
+        const clearBtn = document.getElementById('mobileSearchClearBtn');
+        if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
+
         if (!val) {
           setSearch('');
+          showRecentOrPopularDropdown();
           return;
         }
-        mobileSearchDebounce = setTimeout(() => {
-          setSearch(val);
-        }, 220);
+
+        if (val.trim().length >= 2) {
+          debounce = setTimeout(() => {
+            renderLiveSearchResults(val);
+          }, 110);
+
+          gridDebounce = setTimeout(() => {
+            setSearch(val);
+          }, 260);
+        } else {
+          showRecentOrPopularDropdown();
+          if (state.searchQuery) {
+            setSearch('');
+          }
+        }
       });
-    }
+
+      inputEl.addEventListener('keydown', (e) => {
+        handleDropdownKeyNav(e, inputEl);
+      });
+    };
+
+    setupSearchInput(document.getElementById('searchInput'));
+    setupSearchInput(document.getElementById('mobileSearchInput'));
+
+    document.addEventListener('pointerdown', (e) => {
+      const desktopWrap = document.getElementById('desktopSearchWrap');
+      const mobileWrap = document.getElementById('mobileSearchBar');
+      const isInsideDesktop = desktopWrap && desktopWrap.contains(e.target);
+      const isInsideMobile = mobileWrap && mobileWrap.contains(e.target);
+      if (!isInsideDesktop && !isInsideMobile) {
+        hideSearchDropdown();
+      }
+    });
 
     const drawerOverlay = document.getElementById('categoryDrawerOverlay');
     if (drawerOverlay) {
@@ -2298,6 +2701,14 @@
     togglePlayerEpDrawer,
     downloadSeasonM3u,
     exportSeasonLinksTxt,
+    selectSearchItem,
+    selectPlaySearchItem,
+    viewAllSearchResults,
+    fillAndSearch,
+    removeRecentSearch,
+    clearRecentSearches,
+    hideSearchDropdown,
+    scrollToCatalog,
     loadMoreGrid
   };
 
