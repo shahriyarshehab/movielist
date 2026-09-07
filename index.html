@@ -59,11 +59,6 @@
           <div class="search-live-dropdown" id="searchLiveDropdown" style="display: none;"></div>
         </div>
 
-        <!-- Computer Auto-Open VLC Toggle Button -->
-        <button class="icon-action-btn vlc-desktop-toggle-btn desktop-only" id="btnDesktopVlcToggle" onclick="window.MovieList.toggleVlcDesktop()" title="Auto-Open VLC on Computer" aria-label="Auto-Open VLC on Computer">
-          <i data-lucide="play-circle" style="width:18px;height:18px;"></i>
-          <span class="vlc-desktop-toggle-label" id="lblDesktopVlc">VLC: OFF</span>
-        </button>
 
         <!-- Mobile Search Toggle Button -->
         <button class="icon-action-btn mobile-only" id="btnMobileSearchToggle" onclick="window.MovieList.toggleMobileSearch()" title="Search" aria-label="Search">
@@ -357,17 +352,6 @@
         </div>
       </div>
 
-      <!-- Computer VLC Auto-Open Card -->
-      <div class="vlc-computer-auto-card" id="vlcComputerAutoCard">
-        <div class="vlc-auto-left">
-          <div class="vlc-auto-badge">PC Auto-Open</div>
-          <span class="vlc-auto-title">VLC Player for Computer</span>
-          <span class="vlc-auto-desc">Automatically launch external VLC on your PC when clicking Play</span>
-        </div>
-        <button class="btn-toggle-vlc-auto" id="btnToggleVlcAuto" onclick="window.MovieList.toggleVlcDesktop()">
-          Enable Auto-Open
-        </button>
-      </div>
 
       <div class="ext-player-options-list">
         <button class="ext-player-option-item" onclick="window.MovieList.launchSelectedExternal('vlc')">

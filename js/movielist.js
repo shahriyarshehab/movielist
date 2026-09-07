@@ -26,9 +26,6 @@
     extSelectedUrl: '',
     extSelectedTitle: '',
     defaultPlayer: localStorage.getItem('movielist_default_player') || '',
-    isVlcDesktopAuto:
-      localStorage.getItem('movielist_vlc_desktop') === 'true' ||
-      localStorage.getItem('movielist_default_player') === 'vlc',
     theme: localStorage.getItem('movielist_theme') || 'dark',
     allCatalogLoaded: false,
     tvCatalog: null,
@@ -1489,12 +1486,9 @@
     document.getElementById('modalSizeStat').textContent = movie.size || 'HD Stream';
     document.getElementById('modalDateStat').textContent = movie.date ? movie.date.split(' ')[0] : 'Latest';
 
-    // Configure Play Button text based on Computer VLC Mode
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isVlcAuto = !isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc');
     const modalPlayBtnText = document.getElementById('modalPlayBtnText');
     if (modalPlayBtnText) {
-      modalPlayBtnText.textContent = isVlcAuto ? 'Open in VLC Player' : 'Play Movie';
+      modalPlayBtnText.textContent = 'Play Movie';
     }
 
     const playBtn = document.getElementById('modalPlayBtn');
@@ -1573,78 +1567,7 @@
     }
   }
 
-  // VLC Desktop Auto-Open System for PC / Computer
-  function autoOpenVlcOnComputer(url, title) {
-    if (!url) return;
-    showToast('Auto-opening in VLC Media Player on computer...');
-    try {
-      let iframe = document.getElementById('vlcDispatcherIframe');
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'vlcDispatcherIframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-      }
-      iframe.src = `vlc://${url}`;
-    } catch (e) {
-      window.location.href = `vlc://${url}`;
-    }
-  }
 
-  function toggleVlcDesktop(forceState) {
-    if (typeof forceState === 'boolean') {
-      state.isVlcDesktopAuto = forceState;
-    } else {
-      state.isVlcDesktopAuto = !state.isVlcDesktopAuto;
-    }
-
-    if (state.isVlcDesktopAuto) {
-      state.defaultPlayer = 'vlc';
-      localStorage.setItem('movielist_default_player', 'vlc');
-      localStorage.setItem('movielist_vlc_desktop', 'true');
-      showToast('VLC Auto-Open enabled for Computer');
-    } else {
-      if (state.defaultPlayer === 'vlc') {
-        state.defaultPlayer = '';
-        localStorage.removeItem('movielist_default_player');
-      }
-      localStorage.setItem('movielist_vlc_desktop', 'false');
-      showToast('VLC Auto-Open disabled (using in-browser cinema player)');
-    }
-
-    updateDesktopVlcUi();
-  }
-
-  function updateDesktopVlcUi() {
-    const isVlc = state.isVlcDesktopAuto || state.defaultPlayer === 'vlc';
-    const toggleBtn = document.getElementById('btnDesktopVlcToggle');
-    if (toggleBtn) {
-      toggleBtn.classList.toggle('active', isVlc);
-      const textEl = toggleBtn.querySelector('.vlc-desktop-text');
-      if (textEl) {
-        textEl.textContent = isVlc ? 'VLC: ON' : 'VLC: OFF';
-      }
-    }
-
-    const autoCard = document.getElementById('vlcComputerAutoCard');
-    const btnToggleAuto = document.getElementById('btnToggleVlcAuto');
-    if (autoCard) {
-      autoCard.classList.toggle('active', isVlc);
-    }
-    if (btnToggleAuto) {
-      btnToggleAuto.textContent = isVlc ? 'Disable Auto-Open' : 'Enable Auto-Open';
-    }
-
-    const modalPlayBtnText = document.getElementById('modalPlayBtnText');
-    if (modalPlayBtnText) {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (!isMobile && isVlc) {
-        modalPlayBtnText.textContent = 'Open in VLC Player';
-      } else {
-        modalPlayBtnText.textContent = 'Play Movie';
-      }
-    }
-  }
 
   // TV Series Seasons & Episodes Engine
   function isTvSeries(m) {
@@ -1960,14 +1883,6 @@
     const seriesTitle = (state.activeMovie && state.activeMovie.title) || 'TV Series';
     const cleanEp = cleanEpisodeTitle(ep.name);
     const fullTitle = `${seriesTitle} • ${state.currentSeasonName || 'Season'} Episode ${idx + 1}: ${cleanEp}`;
-
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc')) {
-      autoOpenVlcOnComputer(ep.url, fullTitle);
-      renderEpisodeListHtml(state.currentSeasonEpisodes);
-      return;
-    }
-
     closeDetails();
     playMovie(ep.url, fullTitle);
 
@@ -2209,11 +2124,6 @@
     if (chkDefault && chkDefault.checked && playerType !== 'm3u' && playerType !== 'copy') {
       state.defaultPlayer = playerType;
       localStorage.setItem('movielist_default_player', playerType);
-      if (playerType === 'vlc') {
-        state.isVlcDesktopAuto = true;
-        localStorage.setItem('movielist_vlc_desktop_auto', 'true');
-      }
-      updateDesktopVlcUi();
     }
 
     closeExternalPlayerModal();
@@ -2234,8 +2144,6 @@
   function clearDefaultPlayer() {
     state.defaultPlayer = '';
     localStorage.removeItem('movielist_default_player');
-    state.isVlcDesktopAuto = false;
-    localStorage.removeItem('movielist_vlc_desktop_auto');
     const chkDefault = document.getElementById('chkSetDefaultPlayer');
     if (chkDefault) chkDefault.checked = false;
     const btnClear = document.getElementById('btnClearDefaultPlayer');
@@ -2246,7 +2154,6 @@
       if (badge) badge.style.display = 'none';
     });
 
-    updateDesktopVlcUi();
     showToast('Reset default external player');
   }
 
@@ -2296,12 +2203,6 @@
 
   // Built-in Video Player & Ambilight Engine
   function playMovie(url, title) {
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile && (state.isVlcDesktopAuto || state.defaultPlayer === 'vlc')) {
-      autoOpenVlcOnComputer(url, title);
-      return;
-    }
-
     const playerModal = document.getElementById('playerModal');
     const video = document.getElementById('cinemaVideo');
     const titleEl = document.getElementById('playerTitle');
@@ -2528,7 +2429,14 @@
     loadWatchlist();
     loadCatalog();
     setupKeybindings();
-    updateDesktopVlcUi();
+    try {
+      localStorage.removeItem('movielist_vlc_desktop');
+      localStorage.removeItem('movielist_vlc_desktop_auto');
+      if (localStorage.getItem('movielist_default_player') === 'vlc') {
+        localStorage.removeItem('movielist_default_player');
+        state.defaultPlayer = '';
+      }
+    } catch (e) {}
     setupInfiniteScroll();
 
     const setupSearchInput = (inputEl) => {
@@ -2684,8 +2592,6 @@
     scrollToCategories,
     focusSearch,
     toggleTheme,
-    autoOpenVlcOnComputer,
-    toggleVlcDesktop,
     openCategoryDrawer,
     closeCategoryDrawer,
     selectCategoryFromDrawer,
