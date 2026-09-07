@@ -197,141 +197,174 @@
     </nav>
   </div>
 
-  <!-- Movie Details Modal -->
-  <div class="modal-overlay" id="detailsModal" role="dialog" aria-modal="true" aria-labelledby="modalMovieTitle">
-    <div class="details-modal-card">
-      <div class="modal-drag-handle"></div>
-      <button class="modal-close-btn" onclick="window.MovieList.closeDetails()" aria-label="Close modal">
-        <i data-lucide="x" style="width:18px;height:18px;"></i>
-      </button>
-
-      <div class="modal-hero-banner">
-        <img id="modalBackdropImg" class="modal-backdrop-img" src="" alt="Backdrop">
-        <div class="modal-banner-gradient"></div>
+  <!-- Media Details Full Page View -->
+  <div class="details-fullpage-view" id="detailsModal" role="region" aria-label="Media Details" style="display: none;">
+    <!-- Sticky Glass Top Navigation Bar -->
+    <header class="details-page-header">
+      <div class="details-page-header-inner">
+        <button class="btn-page-back" onclick="window.MovieList.closeDetails()" aria-label="Back to browse">
+          <i data-lucide="arrow-left" style="width:18px;height:18px;"></i>
+          <span>Back</span>
+        </button>
+        <div class="details-page-header-title" id="pageHeaderTitle">Movie Details</div>
+        <div class="details-page-header-actions">
+          <button class="icon-action-btn" id="pageNavWatchlistBtn" onclick="window.MovieList.toggleWatchlistFromPage(event)" title="Watchlist" aria-label="Watchlist">
+            <i data-lucide="bookmark" style="width:18px;height:18px;"></i>
+          </button>
+          <button class="icon-action-btn" onclick="window.MovieList.shareMedia()" title="Share Link" aria-label="Share">
+            <i data-lucide="share-2" style="width:18px;height:18px;"></i>
+          </button>
+          <button class="icon-action-btn" onclick="window.MovieList.closeDetails()" title="Close Details" aria-label="Close">
+            <i data-lucide="x" style="width:18px;height:18px;"></i>
+          </button>
+        </div>
       </div>
+    </header>
 
-      <div class="modal-body-content">
-        <div class="modal-header-grid">
-          <div class="modal-poster-wrap">
-            <img id="modalPosterImg" class="modal-poster-img" src="" alt="Poster">
-          </div>
-          <div class="modal-title-wrap">
-            <h2 id="modalMovieTitle" class="modal-movie-title">Movie Title</h2>
-            <div class="modal-chips-row">
-              <span id="modalQualityTag" class="chip-tag chip-primary">HD</span>
-              <span id="modalRatingTag" class="chip-tag chip-gold">8.5 Rating</span>
-              <span id="modalCategoryTag" class="chip-tag">Category</span>
+    <!-- Main Full-Page Scrollable Content Container -->
+    <main class="details-page-content">
+      <!-- Cinematic Wide Hero Section -->
+      <section class="details-hero-section">
+        <div class="details-hero-backdrop-wrap">
+          <img id="modalBackdropImg" class="details-backdrop-img" src="" alt="Backdrop">
+          <div class="details-hero-vignette"></div>
+        </div>
+
+        <div class="details-hero-container">
+          <div class="details-hero-grid">
+            <div class="details-poster-wrap">
+              <img id="modalPosterImg" class="details-poster-img" src="" alt="Poster">
+              <span class="details-poster-quality" id="posterQualityBadge">HD</span>
+            </div>
+
+            <div class="details-meta-column">
+              <div class="details-chips-row">
+                <span id="modalQualityTag" class="chip-tag chip-primary">HD</span>
+                <span id="modalRatingTag" class="chip-tag chip-gold">8.5 Rating</span>
+                <span id="modalCategoryTag" class="chip-tag">Category</span>
+              </div>
+
+              <h1 id="modalMovieTitle" class="details-movie-title">Movie Title</h1>
+
+              <div class="details-quick-specs">
+                <div class="spec-pill">
+                  <span class="spec-label">Year:</span>
+                  <span class="spec-value" id="modalYearStat">2025</span>
+                </div>
+                <div class="spec-pill">
+                  <span class="spec-label">Audio:</span>
+                  <span class="spec-value">Dual Audio</span>
+                </div>
+                <div class="spec-pill">
+                  <span class="spec-label">Size:</span>
+                  <span class="spec-value" id="modalSizeStat">2.5 GB</span>
+                </div>
+                <div class="spec-pill">
+                  <span class="spec-label">Added:</span>
+                  <span class="spec-value" id="modalDateStat">Latest</span>
+                </div>
+              </div>
+
+              <!-- Primary Action Buttons -->
+              <div class="details-actions-row">
+                <button class="btn-solid-primary btn-hero-play" id="modalPlayBtn">
+                  <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i>
+                  <span id="modalPlayBtnText">Play Movie</span>
+                </button>
+                <button class="btn-glass btn-hero-action" id="modalTrailerBtn">
+                  <i data-lucide="film" style="width:18px;height:18px;"></i>
+                  <span>Watch Trailer</span>
+                </button>
+                <button class="btn-glass btn-hero-action" id="modalWatchlistBtn">
+                  <i data-lucide="bookmark" style="width:18px;height:18px;"></i>
+                  <span>Add to Watchlist</span>
+                </button>
+                <button class="btn-glass btn-hero-action" id="modalExtPlayerBtn" onclick="window.MovieList.openExternalFromDetails()">
+                  <i data-lucide="tv" style="width:18px;height:18px;"></i>
+                  <span>External App</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="modal-details-grid">
-          <div class="details-stat-box">
-            <span class="stat-label">Year</span>
-            <span class="stat-value" id="modalYearStat">2025</span>
+      <!-- Details Page Main Body -->
+      <div class="details-body-wrapper">
+        <!-- External Player Direct Launchers Strip -->
+        <div class="details-panel-card">
+          <div class="details-panel-header">
+            <div class="panel-header-title">
+              <i data-lucide="tv" style="width:18px;height:18px;color:var(--primary);"></i>
+              <span>Direct External Player Launchers</span>
+            </div>
+            <span class="panel-header-sub">Stream in your favorite external video player</span>
           </div>
-          <div class="details-stat-box">
-            <span class="stat-label">Audio</span>
-            <span class="stat-value">Dual Audio</span>
-          </div>
-          <div class="details-stat-box">
-            <span class="stat-label">File Size</span>
-            <span class="stat-value" id="modalSizeStat">2.5 GB</span>
-          </div>
-          <div class="details-stat-box">
-            <span class="stat-label">Updated</span>
-            <span class="stat-value" id="modalDateStat">Latest</span>
-          </div>
-        </div>
-
-        <!-- Action Buttons Row -->
-        <div class="modal-actions-row">
-          <button class="btn-solid-primary" id="modalPlayBtn">
-            <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i>
-            <span id="modalPlayBtnText">Play Movie</span>
-          </button>
-          <button class="btn-glass" id="modalExtPlayerBtn" onclick="window.MovieList.openExternalFromDetails()">
-            <i data-lucide="tv" style="width:16px;height:16px;"></i>
-            External App
-          </button>
-          <button class="btn-glass" id="modalTrailerBtn">
-            <i data-lucide="film" style="width:16px;height:16px;"></i>
-            Watch Trailer
-          </button>
-          <button class="btn-glass" id="modalWatchlistBtn">
-            <i data-lucide="bookmark" style="width:16px;height:16px;"></i>
-            Add to Watchlist
-          </button>
-        </div>
-
-        <!-- External Player Launchers Hub -->
-        <div class="external-players-card">
-          <span class="external-players-title">Launch in External App</span>
           <div class="external-players-grid">
             <button class="btn-ext-player btn-ext-vlc" id="extBtnVlc" title="Play in VLC Media Player">
-              <i data-lucide="play-circle" style="width:14px;height:14px;"></i>
-              VLC Player
+              <i data-lucide="play-circle" style="width:16px;height:16px;"></i>
+              <span>VLC Player</span>
             </button>
             <button class="btn-ext-player btn-ext-mx" id="extBtnMx" title="Play in MX Player (Android)">
-              <i data-lucide="smartphone" style="width:14px;height:14px;"></i>
-              MX Player
+              <i data-lucide="smartphone" style="width:16px;height:16px;"></i>
+              <span>MX Player</span>
             </button>
             <button class="btn-ext-player btn-ext-pot" id="extBtnPot" title="Play in PotPlayer (Windows)">
-              <i data-lucide="monitor" style="width:14px;height:14px;"></i>
-              PotPlayer
+              <i data-lucide="monitor" style="width:16px;height:16px;"></i>
+              <span>PotPlayer</span>
             </button>
             <button class="btn-ext-player btn-ext-copy" id="extBtnCopy" title="Copy Direct Video Link">
-              <i data-lucide="copy" style="width:14px;height:14px;"></i>
-              Copy Stream Link
+              <i data-lucide="copy" style="width:16px;height:16px;"></i>
+              <span>Copy Stream Link</span>
             </button>
           </div>
         </div>
 
         <!-- TV Series Episode & Season Selection Section -->
         <div class="series-episodes-section" id="seriesEpisodesSection" style="display: none;">
-          <div class="series-section-divider"></div>
-          
-          <div class="series-header-row">
-            <div class="series-title-group">
-              <div class="series-title-row">
-                <i data-lucide="layers" style="width:18px;height:18px;color:var(--primary);"></i>
-                <h3 class="series-section-title">Seasons &amp; Episodes</h3>
+          <div class="details-panel-card episodes-panel-card">
+            <div class="series-header-row">
+              <div class="series-title-group">
+                <div class="series-title-row">
+                  <i data-lucide="layers" style="width:20px;height:20px;color:var(--primary);"></i>
+                  <h3 class="series-section-title">Seasons &amp; Episodes</h3>
+                </div>
+                <span class="series-count-badge" id="seasonCountBadge">Loading seasons...</span>
               </div>
-              <span class="series-count-badge" id="seasonCountBadge">Loading seasons...</span>
+
+              <!-- Season Batch Action Buttons -->
+              <div class="season-batch-actions">
+                <button class="season-batch-btn" id="btnExportSeasonM3u" onclick="window.MovieList.downloadSeasonM3u()" title="Export season playlist to play in VLC or media players">
+                  <i data-lucide="list-music" style="width:14px;height:14px;"></i>
+                  <span>Export M3U Playlist</span>
+                </button>
+                <button class="season-batch-btn" id="btnExportSeasonTxt" onclick="window.MovieList.exportSeasonLinksTxt()" title="Export all episode links for IDM / download managers">
+                  <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+                  <span>Export Links (.txt)</span>
+                </button>
+              </div>
             </div>
 
-            <!-- Season Batch Action Buttons -->
-            <div class="season-batch-actions">
-              <button class="season-batch-btn" id="btnExportSeasonM3u" onclick="window.MovieList.downloadSeasonM3u()" title="Export season playlist to play in VLC or media players">
-                <i data-lucide="list-music" style="width:14px;height:14px;"></i>
-                <span>Export M3U Playlist</span>
-              </button>
-              <button class="season-batch-btn" id="btnExportSeasonTxt" onclick="window.MovieList.exportSeasonLinksTxt()" title="Export all episode links for IDM / download managers">
-                <i data-lucide="file-text" style="width:14px;height:14px;"></i>
-                <span>Export Links (.txt)</span>
+            <!-- Season Tabs Selector -->
+            <div class="season-tabs-wrapper" id="seasonTabsWrapper">
+              <div class="season-tabs-row" id="seasonTabsRow"></div>
+            </div>
+
+            <!-- Episode Quick Filter Search Bar -->
+            <div class="episode-filter-box" id="episodeFilterBox" style="display: none;">
+              <i data-lucide="search" style="width:15px;height:15px;color:var(--text-muted);"></i>
+              <input type="text" id="episodeFilterInput" class="episode-filter-input" placeholder="Filter episodes by title, episode number..." aria-label="Filter episodes" oninput="window.MovieList.filterEpisodes(this.value)">
+              <button class="btn-ep-filter-clear" id="btnEpFilterClear" onclick="window.MovieList.clearEpisodeFilter()" style="display: none;" title="Clear search">
+                <i data-lucide="x" style="width:14px;height:14px;"></i>
               </button>
             </div>
-          </div>
 
-          <!-- Season Tabs Selector -->
-          <div class="season-tabs-wrapper" id="seasonTabsWrapper">
-            <div class="season-tabs-row" id="seasonTabsRow"></div>
+            <!-- Episode Cards Grid -->
+            <div class="episode-list-container" id="episodeListContainer"></div>
           </div>
-
-          <!-- Episode Filter Input (for seasons with > 6 episodes) -->
-          <div class="episode-filter-box" id="episodeFilterBox" style="display: none;">
-            <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
-            <input type="text" id="episodeFilterInput" class="ep-filter-input" placeholder="Filter episodes by name or number..." oninput="window.MovieList.filterEpisodes(this.value)" />
-            <button class="ep-filter-clear-btn" id="btnEpFilterClear" onclick="window.MovieList.clearEpisodeFilter()" style="display: none;" aria-label="Clear filter">
-              <i data-lucide="x" style="width:12px;height:12px;"></i>
-            </button>
-          </div>
-
-          <!-- Episode List Grid / Rows -->
-          <div class="episode-list-container" id="episodeListContainer"></div>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 
   <!-- Dedicated External Player Selection Modal -->

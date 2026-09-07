@@ -35,7 +35,8 @@
     currentSelectedSeasonIdx: 0,
     currentPlayingEpisodeIdx: -1,
     episodeFilterQuery: '',
-    gridRenderLimit: 48
+    gridRenderLimit: 48,
+    lastBrowseScrollY: 0
   };
 
   // Safe DOM Sanitizers
@@ -472,6 +473,9 @@
       }
       state.allCatalogLoaded = true;
       scheduleBackgroundFilterRender();
+      if (window.location.hash.startsWith('#media=') && !state.activeMovie) {
+        checkInitialHash();
+      }
     })();
 
     return fullLibraryLoadingPromise;
@@ -565,6 +569,7 @@
     renderHeroCarousel();
     filterAndRenderGrid();
     loadHistory();
+    checkInitialHash();
   }
 
   function processFallbackData() {
@@ -1464,9 +1469,8 @@
     renderGrid();
   }
 
-  // Movie Details Modal Component
-  // Movie Details Modal Component
-  function openDetails(id) {
+  // Movie Details Full Page Component
+  function openDetails(id, pushHistory = true) {
     const movie = state.allMovies.find((m) => m.id === id) || state.carouselMovies.find((m) => m.id === id);
     if (!movie) return;
 
@@ -1474,8 +1478,18 @@
     const modal = document.getElementById('detailsModal');
     if (!modal) return;
 
-    const isWatchlisted = state.watchlist.has(movie.videoUrl);
+    if (!document.body.classList.contains('details-open')) {
+      state.lastBrowseScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    }
 
+    // Sticky Top Bar Header
+    const headerTitle = document.getElementById('pageHeaderTitle');
+    if (headerTitle) headerTitle.textContent = movie.title;
+
+    const qualityBadge = document.getElementById('posterQualityBadge');
+    if (qualityBadge) qualityBadge.textContent = movie.quality || 'HD';
+
+    // Cinematic Hero Elements
     document.getElementById('modalBackdropImg').src = sanitizeUrl(movie.posterUrl);
     document.getElementById('modalPosterImg').src = sanitizeUrl(movie.posterUrl);
     document.getElementById('modalMovieTitle').textContent = movie.title;
@@ -1494,7 +1508,7 @@
     const playBtn = document.getElementById('modalPlayBtn');
     if (playBtn) {
       playBtn.onclick = () => {
-        closeDetails();
+        closeDetails(false);
         playMovie(movie.videoUrl, movie.title);
       };
     }
@@ -1506,16 +1520,7 @@
       };
     }
 
-    const watchBtn = document.getElementById('modalWatchlistBtn');
-    if (watchBtn) {
-      watchBtn.innerHTML = `
-        <i data-lucide="bookmark" style="width:16px;height:16px;${isWatchlisted ? 'fill:currentColor;' : ''}"></i>
-        ${isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
-      `;
-      watchBtn.onclick = (e) => {
-        toggleWatchlist(movie.videoUrl, movie.title, e);
-      };
-    }
+    updateModalWatchlistState();
 
     // Configure External Player Buttons inside details
     const btnVlc = document.getElementById('extBtnVlc');
@@ -1541,17 +1546,61 @@
       state.currentPlayingEpisodeIdx = -1;
     }
 
-    modal.classList.add('active');
+    // Display Full Page View
+    modal.style.display = 'block';
+    modal.scrollTop = 0;
+    document.body.classList.add('details-open');
+    requestAnimationFrame(() => {
+      modal.classList.add('active');
+    });
+
+    // History state navigation for native back button
+    if (pushHistory) {
+      const targetHash = `#media=${encodeURIComponent(movie.id)}`;
+      if (window.location.hash !== targetHash) {
+        history.pushState({ view: 'details', id: movie.id }, '', targetHash);
+      }
+    }
+
     if (window.lucide) window.lucide.createIcons({ root: modal });
   }
 
-  function closeDetails() {
+  function closeDetails(shouldPopHistory = true) {
     const modal = document.getElementById('detailsModal');
-    if (modal) modal.classList.remove('active');
+    if (!modal) return;
+    const isVisible = modal.classList.contains('active') || modal.style.display === 'block';
+    if (!isVisible) return;
+
+    modal.classList.remove('active');
+    setTimeout(() => {
+      if (!modal.classList.contains('active')) {
+        modal.style.display = 'none';
+      }
+    }, 220);
+    document.body.classList.remove('details-open');
+
+    if (typeof state.lastBrowseScrollY === 'number') {
+      window.scrollTo({ top: state.lastBrowseScrollY, behavior: 'instant' });
+    }
+
     const epSection = document.getElementById('seriesEpisodesSection');
     if (epSection) epSection.style.display = 'none';
     state.activeMovie = null;
     state.currentTvEntry = null;
+
+    if (shouldPopHistory) {
+      if (window.location.hash.startsWith('#media=')) {
+        if (window.history.state && window.history.state.view === 'details') {
+          window.history.back();
+        } else {
+          try {
+            history.replaceState('', document.title, window.location.pathname + window.location.search);
+          } catch (e) {
+            window.location.hash = '';
+          }
+        }
+      }
+    }
   }
 
   function updateModalWatchlistState() {
@@ -1563,7 +1612,52 @@
         <i data-lucide="bookmark" style="width:16px;height:16px;${isWatchlisted ? 'fill:currentColor;' : ''}"></i>
         ${isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
       `;
+      watchBtn.onclick = (e) => {
+        toggleWatchlist(state.activeMovie.videoUrl, state.activeMovie.title, e);
+      };
       if (window.lucide) window.lucide.createIcons({ root: watchBtn });
+    }
+
+    const pageNavBtn = document.getElementById('pageNavWatchlistBtn');
+    if (pageNavBtn) {
+      pageNavBtn.innerHTML = `<i data-lucide="bookmark" style="width:18px;height:18px;${isWatchlisted ? 'fill:currentColor;color:var(--primary);' : ''}"></i>`;
+      if (window.lucide) window.lucide.createIcons({ root: pageNavBtn });
+    }
+  }
+
+  function toggleWatchlistFromPage(event) {
+    if (!state.activeMovie) return;
+    toggleWatchlist(state.activeMovie.videoUrl, state.activeMovie.title, event);
+  }
+
+  function shareMedia() {
+    if (!state.activeMovie) return;
+    const shareUrl = `${window.location.origin}${window.location.pathname}#media=${encodeURIComponent(state.activeMovie.id)}`;
+    const shareData = {
+      title: state.activeMovie.title,
+      text: `Watch ${state.activeMovie.title} on CineBox`,
+      url: shareUrl
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      navigator.share(shareData).catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast('Media link copied to clipboard!');
+      }).catch(() => {
+        showToast('Link: ' + shareUrl);
+      });
+    } else {
+      showToast('Link: ' + shareUrl);
+    }
+  }
+
+  function checkInitialHash() {
+    if (window.location.hash.startsWith('#media=')) {
+      const id = decodeURIComponent(window.location.hash.replace('#media=', ''));
+      if (id) {
+        openDetails(id, false);
+      }
     }
   }
 
@@ -2524,12 +2618,22 @@
       });
     }
 
-    const detailsModal = document.getElementById('detailsModal');
-    if (detailsModal) {
-      detailsModal.addEventListener('click', (e) => {
-        if (e.target === detailsModal) closeDetails();
-      });
-    }
+    // Browser / Phone Back navigation support for full-page details
+    window.addEventListener('popstate', (e) => {
+      if (e.state && e.state.view === 'details' && e.state.id) {
+        openDetails(e.state.id, false);
+      } else if (window.location.hash.startsWith('#media=')) {
+        const mediaId = decodeURIComponent(window.location.hash.replace('#media=', ''));
+        if (mediaId) {
+          openDetails(mediaId, false);
+        }
+      } else {
+        const detailsModalEl = document.getElementById('detailsModal');
+        if (detailsModalEl && (detailsModalEl.classList.contains('active') || detailsModalEl.style.display === 'block')) {
+          closeDetails(false);
+        }
+      }
+    });
 
     const playerModal = document.getElementById('playerModal');
     if (playerModal) {
@@ -2570,6 +2674,8 @@
     removeHistory,
     openDetails,
     closeDetails,
+    shareMedia,
+    toggleWatchlistFromPage,
     openTrailer,
     closeTrailer,
     playMovie,
