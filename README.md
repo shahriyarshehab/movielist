@@ -1,10 +1,12 @@
-# CineBox
+# MovieList
 
-Ultra-Speed Cinema & HD Media Streaming Platform
+Modern Cinema Streaming and HD Media Platform
 
-CineBox is an open-source, high-performance web streaming application built for ultra-fast local and broadband (BDIX) networks. It catalogs and streams movies, television series, and animations with adaptive HLS streaming, Web Audio channel splitting for dual-audio releases, and an integrated media player.
+MovieList is an open-source, high-performance cinema web application designed for ultra-fast performance on broadband and BDIX (Bangladesh Internet Exchange) networks. It provides instant streaming for movies, television series, anime, and dramas with a glassmorphic user interface, built-in cinema player, smart multi-token search, and native external player support.
 
-Live Site: [https://shahriyarshehab.github.io/cinebox/](https://shahriyarshehab.github.io/cinebox/)
+Live Site: [https://shahriyarshehab.github.io/movielist/](https://shahriyarshehab.github.io/movielist/)
+
+GitHub Repository: [https://github.com/shahriyarshehab/movielist](https://github.com/shahriyarshehab/movielist)
 
 ---
 
@@ -18,70 +20,81 @@ Live Site: [https://shahriyarshehab.github.io/cinebox/](https://shahriyarshehab.
   - [Installation and Running](#installation-and-running)
   - [Server CLI Options](#server-cli-options)
 - [Core Systems](#core-systems)
-  - [Audio DSP and Channel Splitting Engine](#audio-dsp-and-channel-splitting-engine)
-  - [Adaptive Streaming and Server Failover](#adaptive-streaming-and-server-failover)
-  - [Mother Server Connection Monitoring](#mother-server-connection-monitoring)
-  - [Subtitles and VTT Synchronization](#subtitles-and-vtt-synchronization)
-  - [TV Series and Season Explorer](#tv-series-and-season-explorer)
-  - [External Player and Download Hub](#external-player-and-download-hub)
-- [Automation and Data Scraping](#automation-and-data-scraping)
+  - [Ultra-Fast Category Separation and Background Hydration](#ultra-fast-category-separation-and-background-hydration)
+  - [Smart Relevance Search Engine](#smart-relevance-search-engine)
+  - [TV Series Seasons and Episode Explorer](#tv-series-seasons-and-episode-explorer)
+  - [Computer VLC Auto-Play and External Player Launchers](#computer-vlc-auto-play-and-external-player-launchers)
+  - [Cinema Suite and Dynamic Ambilight Engine](#cinema-suite-and-dynamic-ambilight-engine)
+  - [Mobile App Interface and Bottom Dock](#mobile-app-interface-and-bottom-dock)
+- [Automation and Scraper Scripts](#automation-and-scraper-scripts)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Security and Code Quality](#security-and-code-quality)
+- [Code Quality and Verification](#code-quality-and-verification)
 - [License](#license)
 
 ---
 
 ## Overview
 
-CineBox is designed to work seamlessly in high-speed intranet/broadband environments, particularly BDIX networks, where content is hosted on direct HTTP servers. The front end is fully responsive, lightweight, and functions both as a traditional web portal and as an installable Progressive Web App (PWA).
+MovieList is engineered for instantaneous response times and zero-latency browsing across media catalogs exceeding 18,900 titles. Built using standard ES6+ JavaScript, custom glassmorphic CSS, and a Node.js development server, MovieList functions as both a responsive web application and an installable Progressive Web App (PWA).
 
-The user interface follows a modern glassmorphism design language with ambient glow backdrops, intuitive video controls, YouTube-style settings panels, and dedicated touch gestures for mobile devices.
+Content is fetched directly from high-speed HTTP file nodes. The application separates initial home payloads into lightweight category slices for a 10-20ms first contentful paint, then streams complete background catalogs asynchronously without locking the main browser thread.
 
 ---
 
 ## Key Features
 
-- Extensive Catalog: Movies, TV series, Korean drama, anime, and regional cinema organized into searchable collections.
-- Web Audio API DSP: Audio gain booster (up to 300%), dynamic compression, dialogue enhancement filter, and stereo channel routing.
-- Dual-Audio Separation: Dedicated channel splitter that isolates Left (Dub 1) and Right (Dub 2) audio channels for dual-audio video files.
-- Adaptive Bitrate Streaming: Integrated Hls.js engine for `.m3u8` streams with automatic fallback to native HTML5 playback.
-- Mother Server Health Monitoring: Automated fallback across alternative server mirrors with an on-screen connection troubleshooting modal and 12-second timeout watchdog.
-- Zero-Lag Instant Search: Client-side fuzzy matching with Levenshtein typo tolerance and instant dropdown recommendations.
-- Playback Memory: Automatic playback position recording in localStorage with one-click resume.
-- TV Series Explorer: Episode parsing, season switching, next-episode autoplay countdowns, and batch playlist exports.
-- External Player Integrations: One-click intent launchers for VLC Media Player, MX Player, PotPlayer, 1DM, and ADM.
-- Progressive Web App: Offline caching using a Stale-While-Revalidate Service Worker strategy.
+- Comprehensive Media Library: Over 18,900 titles indexed across Hollywood 1080p, Bollywood (Hindi), TV and Web Series, K-Drama, Animation and Anime, Bangla Cinema, South Indian Action, and 3D releases.
+- Instant 10ms Home Boot: Independent category JSON architecture ensures immediate rendering of top releases on home page load.
+- Smart Search and Relevance Ranking: Token-based fuzzy search with relevance scoring (exact match, prefix, substring, and token matches) and windowed DOM pagination to eliminate browser freezes.
+- Complete TV Series Explorer: Multi-season tabs, episode counts, live episode search, direct episode streaming, season playlist export (.m3u), and download manager link export (.txt).
+- In-Player Episode Navigation: Slide-out episode drawer and next/previous controls inside the cinema player with automatic playback advancement.
+- Computer VLC Auto-Play: Direct native dispatch to VLC Media Player on desktop browsers via custom protocol handling.
+- External Player Launchers: Deep-link integration for VLC Player, MX Player, and PotPlayer, along with M3U playlist file generation.
+- Dynamic Ambilight Glow: Real-time canvas frame sampling providing responsive ambient edge lighting behind the video canvas.
+- Mobile-First App Navigation: Fixed bottom dock, slide-up category drawer, expandable search bar, and bottom-sheet touch modals.
+- Progressive Web App: Offline caching and instant asset delivery powered by a Stale-While-Revalidate service worker.
 
 ---
 
 ## Architecture and Directory Structure
 
 ```
-cinebox/
-├── index.html              # Main landing page with hero carousel and category rows
-├── movies.html             # Dedicated movies catalog with multi-faceted filtering
-├── tv.html                 # Television and web series explorer
-├── animation.html          # Animation and anime catalog
-├── watchlist.html          # User bookmarks and Continue Watching hub
-├── watch.html              # Dedicated player view with cinema controls and settings
-├── server.js               # Node.js development HTTP server with live-reload SSE
-├── sw.js                   # Service Worker (Stale-While-Revalidate caching)
-├── package.json            # Node project configuration and script definitions
-├── manifest.json           # PWA web app manifest
-├── metadata_cache.json     # Preloaded metadata cache for offline / instant load
-├── tv_index.json           # Indexed TV series directory with seasons and episodes
+movielist/
+├── index.html              # Main Single Page Application interface
 ├── css/
-│   └── style.css           # Core styling, responsive layouts, and animations
+│   └── movielist.css       # Glassmorphism design system, responsive styles, and animations
 ├── js/
-│   ├── core.js             # Shared storage, toast, sanitizer, and watchlist utilities
-│   ├── audio-engine.js     # Web Audio API booster, EQ, and multi-track switching
-│   ├── app.js              # Catalog browsing, search index, and home carousels
-│   ├── watch.js            # Video player runtime, gestures, and TV season navigation
-│   └── lucide.min.js       # Lucide vector icon library
+│   ├── movielist.js        # Core application controller, player, search, and TV episode engine
+│   └── lucide.min.js       # Lucide vector icon runtime library
+├── server.js               # Node.js HTTP server with Range request seeking and SSE live reload
+├── sw.js                   # Progressive Web App Service Worker (Stale-While-Revalidate)
+├── package.json            # Scripts, dependencies, and project metadata
+├── manifest.json           # Web App Manifest for mobile and desktop installation
+├── tv_index.json           # Indexed TV series mapped with seasons and direct episode URLs
+├── home_data.json          # Compiled home screen categories and carousel configuration
+├── data/
+│   ├── categories/         # Lightweight separated category files for fast first-paint
+│   │   ├── today.json
+│   │   ├── top_rated.json
+│   │   ├── hollywood.json
+│   │   ├── bollywood.json
+│   │   ├── tv_series.json
+│   │   ├── kdrama.json
+│   │   ├── animation.json
+│   │   └── bangla.json
+│   ├── tv_series.json      # Complete TV directory (2,390+ series)
+│   ├── hollywood.json      # Complete Hollywood directory (3,840+ movies)
+│   ├── bollywood.json      # Complete Bollywood directory (3,710+ movies)
+│   ├── kdrama.json         # Complete Korean drama directory
+│   ├── animation.json      # Complete animation and anime directory
+│   ├── bangla.json         # Complete Bangla movies directory
+│   ├── south_action.json   # South Indian Hindi dubbed movies
+│   ├── latest.json         # Latest release crawler feed
+│   └── today.json          # Media items uploaded today
 └── scripts/
-    ├── auto_update.py      # Mother server crawler and catalog synchronization
-    ├── crawl_tv_episodes.py# Deep TV directory crawler for season and episode mapping
-    └── compress_tv_index.py# JSON index compression for tv_index.json
+    ├── auto_update.py      # Mother server scraper and category generator
+    ├── crawl_tv_episodes.py# Recursive TV directory and episode crawler
+    └── compress_tv_index.py# JSON index compression utility
 ```
 
 ---
@@ -90,40 +103,40 @@ cinebox/
 
 ### Prerequisites
 
-- Node.js (v14.0 or higher recommended)
-- Python 3 (optional, required only for running crawler scripts)
+- Node.js (version 16.0 or higher recommended)
+- Python 3 (optional, required only for running upstream crawler scripts)
 
 ### Installation and Running
 
-Clone the repository and launch the built-in development server:
+Clone the repository and launch the development server:
 
 ```bash
 # Clone repository
-git clone https://github.com/shahriyarshehab/cinebox.git
-cd cinebox
+git clone https://github.com/shahriyarshehab/movielist.git
+cd movielist
 
 # Start local server
 npm start
 
-# Or start in development mode (auto-opens default browser)
+# Or start with browser auto-launch
 npm run dev
 ```
 
-The server will bind to `http://localhost:3000` (or the next available port if 3000 is occupied).
+The server binds to `http://localhost:3000` (automatically increments the port if 3000 is occupied).
 
 ### Server CLI Options
 
-The custom server implementation (`server.js`) includes built-in command-line arguments:
+The server implementation (`server.js`) includes built-in command-line flags:
 
 ```bash
 # Run on a custom port
 node server.js --port 8080
-# Or using the shorthand:
+# Or using shorthand:
 node server.js -p 8080
 
-# Auto-launch default browser
+# Auto-open default browser on start
 node server.js --open
-# Or using the shorthand:
+# Or using shorthand:
 node server.js -o
 ```
 
@@ -131,72 +144,72 @@ node server.js -o
 
 ## Core Systems
 
-### Audio DSP and Channel Splitting Engine
+### Ultra-Fast Category Separation and Background Hydration
 
-The dedicated audio engine (`js/audio-engine.js`) interfaces directly with the Web Audio API to provide advanced audio processing:
+To eliminate initial payload bottlenecks, the home screen loads modular JSON files located in `data/categories/` in parallel. Each category file contains the first 16 releases, allowing the home interface to render in 10-20ms.
 
-1. Volume Booster: A GainNode amplification chain allows volume to be increased safely up to 300% without hard digital clipping.
-2. Equalizer Profiles:
-   - Standard: Flat response curve.
-   - Dialogue Enhancer: Peaking filter at 2.5 kHz (+6 dB, Q=1.2) coupled with dynamic compression to prioritize dialogue intelligibility.
-   - Bass Cinema: Low-shelf filter at 120 Hz (+7 dB) for low-end theatrical resonance.
-   - Night Mode: Aggressive dynamic compression (12:1 ratio, -32 dB threshold) to normalize explosions and soft whisper scenes.
-3. Dual-Audio Stereo Channel Splitting: Many video files encode different audio languages on separate channels of a single stereo track (e.g., Hindi on Channel 0, English on Channel 1). Using `ChannelSplitterNode` and `ChannelMergerNode`, CineBox can route either the left or right channel to both speakers, effectively acting as an audio track selector for dual-audio media.
-4. External Audio Sync: Synchronize external `.mp3` or `.aac` tracks with on-screen video, with sub-second offset adjustments (`+0.1s` / `-0.1s`).
+Once the initial interface is rendered, `loadFullLibraryInBackground()` asynchronously populates the complete 18,900+ title catalog in debounced background stages so that all movies and television series (such as Game of Thrones, Breaking Bad, and Stranger Things) are immediately searchable.
 
-### Adaptive Streaming and Server Failover
+### Smart Relevance Search Engine
 
-When a video begins playback, CineBox constructs an array of server mirrors based on known BDIX server clusters (DhakaFlix, SamOnline, Elaach, Triangle). 
+The search system is engineered to handle massive catalogs without UI thread freezing:
 
-- If an HLS `.m3u8` stream is detected, `Hls.js` is dynamically instantiated with low-latency worker threads and buffer management.
-- Standard MP4/WebM files stream directly through native HTML5 elements with Range header support for instantaneous scrubbing.
-- If the primary server node fails or returns an error, playback automatically switches to the next available mirror seamlessly.
+1. Token-Based Scoring: Search queries are tokenized and scored across candidate titles:
+   - Exact title match: 1000 points
+   - Prefix match: 800 points
+   - Substring match: 600 points
+   - Multi-word token coverage: 400+ points
+2. DOM Windowing: Search and catalog grids render an initial batch of 48 cards (`GRID_PAGE_SIZE = 48`), keeping DOM node counts low and rendering times under 2ms.
+3. Infinite Scroll: Additional results load automatically as the user scrolls near the bottom of the page, or via the manual "Load More" button.
+4. Inline SVG Optimization: Card buttons use self-contained inline SVG markup, completely removing the overhead of runtime icon replacements on large lists.
 
-### Mother Server Connection Monitoring
+### TV Series Seasons and Episode Explorer
 
-When streaming from BDIX networks, private intranet servers (`172.16.50.x`) may become unreachable if the user is connected to mobile data or an unpeered ISP. CineBox includes:
+Episodic media is cross-referenced with `tv_index.json`:
 
-- Watchdog Timer: A 12-second connection watchdog detects silent packet drops where browsers fail to trigger native error events.
-- Error Modal: If all server mirrors fail, a modal appears inside the player explaining the issue, displaying the target server address, and providing direct buttons to retry, cycle mirrors, or open the link in external media players.
+- Season Tabs: Horizontal navigation pills for Season 1 through Season N, plus Specials.
+- Episode Directory: Each card displays episode index, cleaned title, quality tags, and one-click stream buttons.
+- Season M3U Export: Generates an extended `.m3u` playlist containing all season episodes for media center playback.
+- Links Export (.txt): Exports direct HTTP stream URLs for mass importing into download managers (IDM, 1DM, JDownloader).
+- In-Player Episode Navigation: Video player features Previous Episode, Next Episode, and a slide-out episode drawer for jumping between episodes without exiting cinema view.
+- Auto-Advance: When an episode finishes, playback automatically proceeds to the next episode.
 
-### Subtitles and VTT Synchronization
+### Computer VLC Auto-Play and External Player Launchers
 
-- Drag-and-Drop: Drop any `.srt` or `.vtt` file directly onto the player window.
-- Auto-Conversion: `.srt` files are parsed and transformed in real-time into WebVTT blobs for native track display.
-- Sync Controls: Live offset adjustments (`+0.5s` / `-0.5s`) without requiring video reloading.
-- Visual Customization: Real-time controls for font size, font color, background style (translucent, solid, outline, shadow), and vertical positioning.
+For users who prefer native media playback:
 
-### TV Series and Season Explorer
+- Desktop VLC Mode: Toggle the VLC button in the top navigation bar. When active, clicking "Play Movie" or any episode stream button on a desktop computer directly dispatches the stream to native VLC Media Player via the `vlc://${url}` protocol using a hidden iframe dispatcher.
+- External Player Modal: Support for VLC, MX Player (`intent:` scheme for Android), and PotPlayer (`potplayer://`).
+- Link Copying: Instant direct stream URL clipboard copying.
 
-For episodic content, CineBox resolves seasons and episodes using `tv_index.json`. Features include:
+### Cinema Suite and Dynamic Ambilight Engine
 
-- Multi-Season Navigation: Tabbed season selection with instant episode counts.
-- Autoplay Next Episode: A countdown prompt overlays 10 seconds before an episode ends, allowing continuous viewing.
-- Episode Filter: Live search field inside the season drawer to quickly find specific episodes by title or episode number.
+- Dynamic Ambilight: Uses an off-screen HTML5 canvas element to sample active video frames and project a real-time glowing ambient backdrop behind the cinema player.
+- Playback Memory: Remembers exact playback timestamps in localStorage with resume support.
+- Speed Control: Quick playback rate adjustment from 0.5x to 2.0x.
 
-### External Player and Download Hub
+### Mobile App Interface and Bottom Dock
 
-Users who prefer dedicated desktop or mobile media players can launch streams directly:
-
-- One-Click Launchers: Deep link handlers for VLC Media Player (`vlc://`), MX Player (`intent:`), and PotPlayer (`potplayer://`).
-- Batch Playlist Export: Generate and download `.m3u` playlists containing all season episodes for media center importing.
-- Mobile Downloaders: Integration with 1DM and ADM download managers for multi-threaded chunk downloading.
+- Fixed Navigation Dock: Quick navigation buttons for Home, Categories, Watchlist, Search, and Theme toggle pinned at the bottom of mobile screens.
+- Category Bottom Sheet: Full-screen sliding drawer presenting all categories with titles and badges.
+- Expandable Mobile Search: Header search toggle with instant clear and autofocus.
+- Bottom Sheet Modals: Details, player settings, and external player modals slide up from the bottom with native-feeling touch handles.
 
 ---
 
-## Automation and Data Scraping
+## Automation and Scraper Scripts
 
-The repository includes Python crawling utilities located in the `scripts/` directory:
+The `scripts/` directory contains automation utilities:
 
-- `scripts/auto_update.py`: Crawls upstream mother servers, parses release directories, categorizes entries, generates `data/latest.json` and `data/today.json`, and updates `home_data.json`.
-- `scripts/crawl_tv_episodes.py`: Recursively maps television series season directories and generates structured episode lists.
-- `scripts/compress_tv_index.py`: Minifies and optimizes the television index for low bandwidth delivery.
+- `scripts/auto_update.py`: Crawls upstream mother servers (172.16.50.x), categorizes releases, cleans release tags, generates `data/latest.json` and `data/today.json`, updates `home_data.json`, and outputs pre-split category files to `data/categories/`.
+- `scripts/crawl_tv_episodes.py`: Traverses TV directories to map seasons and video files.
+- `scripts/compress_tv_index.py`: Minifies television series directories into the compressed `tv_index.json` structure.
 
-To manually trigger a catalog synchronization:
+To execute a catalog update:
 
 ```bash
 npm run update
-# Or directly:
+# Or run directly:
 python scripts/auto_update.py
 ```
 
@@ -204,34 +217,26 @@ python scripts/auto_update.py
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
+| Key | Action |
 |---|---|
-| `Space` / `K` | Play / Pause toggle |
-| `←` / `→` | Seek backward / forward by configured step |
-| `J` / `L` | Seek backward / forward by 10 seconds |
-| `↑` / `↓` | Volume up / down by 5% |
+| `Space` / `K` | Play / Pause video |
+| `F` | Toggle fullscreen |
 | `M` | Mute / Unmute audio |
-| `F` | Toggle Fullscreen |
-| `T` | Toggle Theater mode |
-| `B` | Open Audio Track & Channel Selector |
-| `C` | Toggle Subtitles |
-| `N` | Play Next Episode (TV Series) |
-| `P` | Play Previous Episode (TV Series) |
-| `>` / `<` | Increase / Decrease playback speed |
-| `D` | Cycle Aspect Ratio (Contain, Cover, 16:9, 4:3, 21:9) |
-| `Ctrl + K` / `/` | Focus global search bar |
-| `Esc` | Exit fullscreen, player mode, or close active modals |
+| `←` / `→` | Seek backward / forward by 10 seconds |
+| `N` | Play next episode (TV Series) |
+| `P` | Play previous episode (TV Series) |
+| `E` | Toggle in-player episode drawer |
+| `Esc` | Close player, details modal, or active drawer |
 
 ---
 
-## Security and Code Quality
+## Code Quality and Verification
 
-The codebase enforces strict defensive engineering standards:
+Defensive programming standards enforced across the project:
 
-- XSS Prevention: All dynamic strings, titles, actor names, and URLs pass through `escapeHtml()` and `sanitizeUrl()` before rendering into the DOM.
-- Path Traversal Guard: The Node.js static server verifies that requested relative file paths strictly resolve inside the application root directory.
-- Service Worker Architecture: Static assets employ a Stale-While-Revalidate strategy to prevent cache trapping and ensure updates deploy immediately on client revisit.
-- Linter Verification: All JavaScript files are syntax-verified via `npm run lint`:
+- DOM Sanitization: All dynamic data is escaped via `escapeHtml()`, `escapeQuotes()`, and `sanitizeUrl()` before insertion.
+- Static Server Path Security: Node.js server validates relative file requests to prevent directory traversal attacks.
+- Linter Verification: Run syntax verification before deployments:
   ```bash
   npm run lint
   ```
