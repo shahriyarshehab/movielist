@@ -2182,6 +2182,19 @@ body.details-open {
   color: #fff;
 }
 
+.player-audio-select {
+  max-width: 140px;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .player-audio-select {
+    max-width: 105px;
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+}
+
 /* ==========================================================================
    External Player Launchers (VLC, MX Player, PotPlayer)
    ========================================================================== */

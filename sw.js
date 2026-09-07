@@ -1,9 +1,10 @@
-const CACHE_NAME = 'movielist-v10';
+const CACHE_NAME = 'movielist-v11';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './css/movielist.css',
   './js/lucide.min.js',
+  './js/audio-engine.js',
   './js/movielist.js',
   './icons/icon.svg',
   './icons/icon-192.png',

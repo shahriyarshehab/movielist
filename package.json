@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "node server.js --open",
     "serve": "node server.js --open",
-    "lint": "node -c js/movielist.js server.js",
+    "lint": "node -c js/audio-engine.js js/movielist.js server.js",
     "update": "python scripts/auto_update.py"
   },
   "keywords": [

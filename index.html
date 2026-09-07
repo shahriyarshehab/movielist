@@ -573,6 +573,11 @@
             <i data-lucide="tv" style="width:14px;height:14px;"></i>
             <span>External App</span>
           </button>
+          <select id="playerAudioTrackSelect" class="player-speed-select player-audio-select" onchange="window.MovieList.setAudioTrack(this.value)" title="Dual Audio & Audio Track Selector" aria-label="Audio Track Selector">
+            <option value="stereo" selected>Audio: Stereo</option>
+            <option value="left">Audio 1: Left (Hindi / Dub)</option>
+            <option value="right">Audio 2: Right (English / Orig)</option>
+          </select>
           <select class="player-speed-select" onchange="window.MovieList.setPlaybackSpeed(this.value)" title="Playback Speed">
             <option value="0.75">0.75x</option>
             <option value="1" selected>1.0x (Normal)</option>
@@ -713,6 +718,9 @@
 
   <!-- Lucide Icons Library -->
   <script src="js/lucide.min.js"></script>
+
+  <!-- Web Audio DSP & Dual Audio Engine -->
+  <script src="js/audio-engine.js"></script>
 
   <!-- MovieList Core Application Script -->
   <script src="js/movielist.js"></script>

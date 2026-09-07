@@ -2921,6 +2921,16 @@
 
     playerModal.classList.add('active');
 
+    // Reset audio track selector to stereo
+    const audioSelect = document.getElementById('playerAudioTrackSelect');
+    if (audioSelect) {
+      audioSelect.innerHTML = `
+        <option value="stereo" selected>Audio: Stereo</option>
+        <option value="left">Audio 1: Left (Hindi / Dub)</option>
+        <option value="right">Audio 2: Right (English / Orig)</option>
+      `;
+    }
+
     // Restore saved playback position
     const resumeKey = `movielist_resume_${url}`;
     const savedTime = parseFloat(localStorage.getItem(resumeKey) || '0');
@@ -2938,8 +2948,40 @@
       }
     };
 
+    video.onloadedmetadata = () => {
+      // Auto-detect discrete multi-audio tracks when supported by browser
+      if (window.CineBoxAudio && audioSelect) {
+        const discreteTracks = window.CineBoxAudio.detectDiscreteTracks(video);
+        if (discreteTracks && discreteTracks.length > 1) {
+          audioSelect.innerHTML = '';
+          discreteTracks.forEach((t) => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = t.label;
+            if (t.enabled) opt.selected = true;
+            audioSelect.appendChild(opt);
+          });
+          const sepOpt = document.createElement('option');
+          sepOpt.disabled = true;
+          sepOpt.textContent = '--- Dual Audio Channels ---';
+          audioSelect.appendChild(sepOpt);
+          const leftOpt = document.createElement('option');
+          leftOpt.value = 'left';
+          leftOpt.textContent = 'Channel 1: Left (Dub / Hindi)';
+          audioSelect.appendChild(leftOpt);
+          const rightOpt = document.createElement('option');
+          rightOpt.value = 'right';
+          rightOpt.textContent = 'Channel 2: Right (Orig / English)';
+          audioSelect.appendChild(rightOpt);
+        }
+      }
+    };
+
     video.onplay = () => {
       startAmbilightLoop();
+      if (window.CineBoxAudio) {
+        window.CineBoxAudio.init(video);
+      }
     };
 
     video.onpause = () => {
@@ -2963,6 +3005,11 @@
     const playerModal = document.getElementById('playerModal');
     const video = document.getElementById('cinemaVideo');
     stopAmbilightLoop();
+    if (window.CineBoxAudio) {
+      window.CineBoxAudio.reset(video);
+    }
+    const audioSelect = document.getElementById('playerAudioTrackSelect');
+    if (audioSelect) audioSelect.value = 'stereo';
     if (video) {
       video.pause();
       video.removeAttribute('src');
@@ -3031,6 +3078,19 @@
     if (video) {
       video.playbackRate = parseFloat(speed);
       showToast(`Playback speed set to ${speed}x`);
+    }
+  }
+
+  function setAudioTrack(mode) {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    if (window.CineBoxAudio) {
+      const res = window.CineBoxAudio.setAudioMode(mode, video);
+      if (res && res.label) {
+        showToast(`Audio: ${res.label}`);
+      } else if (res && res.error) {
+        showToast(res.error);
+      }
     }
   }
 
@@ -3281,6 +3341,7 @@
     closePlayer,
     toggleAmbilight,
     setPlaybackSpeed,
+    setAudioTrack,
     launchVLC,
     launchMX,
     launchPotPlayer,
