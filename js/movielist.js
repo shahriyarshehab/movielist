@@ -1520,7 +1520,54 @@
       };
     }
 
+    // Direct Download Button
+    const downloadBtn = document.getElementById('modalDownloadBtn');
+    if (downloadBtn) {
+      downloadBtn.href = sanitizeUrl(movie.videoUrl);
+      downloadBtn.setAttribute('download', (movie.title || 'media') + '.mp4');
+      const dlText = document.getElementById('modalDownloadBtnText');
+      if (dlText) dlText.textContent = isTvSeries(movie) ? 'Download' : 'Download Movie';
+    }
+
     updateModalWatchlistState();
+
+    // Reset Synopsis & Technical Info to base scraped state
+    const synText = document.getElementById('detailsSynopsisText');
+    const synMore = document.getElementById('btnSynopsisMore');
+    if (synText) {
+      synText.textContent = 'Stream and download high-speed 1080p HD media with zero buffering on BDIX networks.';
+      synText.classList.remove('expanded');
+    }
+    if (synMore) {
+      synMore.style.display = 'none';
+      synMore.textContent = 'More';
+    }
+
+    const castSection = document.getElementById('detailsCastSection');
+    const castGrid = document.getElementById('detailsCastGrid');
+    const dirHeadline = document.getElementById('detailsDirectorHeadline');
+    if (castSection) castSection.style.display = 'none';
+    if (castGrid) castGrid.innerHTML = '';
+    if (dirHeadline) dirHeadline.textContent = 'Leading performers';
+
+    const setTech = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val || '—';
+    };
+    setTech('techReleaseVal', movie.date ? movie.date.split(' ')[0] : (movie.year || '2025'));
+    setTech('techDirectorVal', '—');
+    setTech('techQualityVal', movie.quality || '1080p Full HD');
+    setTech('techAudioVal', 'Dual Audio / Original');
+    setTech('techSizeVal', movie.size || 'HD Stream');
+
+    const wWriter = document.getElementById('techWriterItem');
+    if (wWriter) wWriter.style.display = 'none';
+    const wBox = document.getElementById('techBoxOfficeItem');
+    if (wBox) wBox.style.display = 'none';
+    const wCountry = document.getElementById('techCountryItem');
+    if (wCountry) wCountry.style.display = 'none';
+    const wAwards = document.getElementById('techAwardsItem');
+    if (wAwards) wAwards.style.display = 'none';
 
     // Configure External Player Buttons inside details
     const btnVlc = document.getElementById('extBtnVlc');
@@ -1534,6 +1581,9 @@
 
     const btnCopy = document.getElementById('extBtnCopy');
     if (btnCopy) btnCopy.onclick = () => copyStreamLink(movie.videoUrl);
+
+    // Hydrate rich metadata (Plot, Cast, Director, Box Office, Awards)
+    loadAndApplyOnlineMetadata(movie);
 
     // Check if TV Series / Episodic Media
     if (isTvSeries(movie)) {
@@ -1658,6 +1708,363 @@
       if (id) {
         openDetails(id, false);
       }
+    }
+  }
+
+  // Synopsis expand/collapse toggle
+  function toggleSynopsis() {
+    const synText = document.getElementById('detailsSynopsisText');
+    const synMore = document.getElementById('btnSynopsisMore');
+    if (!synText) return;
+    const isExpanded = synText.classList.toggle('expanded');
+    if (synMore) {
+      synMore.textContent = isExpanded ? 'Less' : 'More';
+    }
+  }
+
+  // Media Info Title Cleaner
+  function parseCleanMediaInfo(rawTitle) {
+    if (!rawTitle) return { cleanName: '', year: '', isSeries: false };
+    const title = rawTitle.trim().replace(/^\d+\.\s*/, '');
+    const isSeries = /TV\s*(Series|Mini\s*Series)?/i.test(title);
+    const yearMatch = title.match(/\b(19\d{2}|20\d{2})\b/);
+    const year = yearMatch ? yearMatch[1] : '';
+
+    const cleanName = title
+      .replace(/\(TV\s*(Series|Mini\s*Series)?[^)]*\)/gi, '')
+      .replace(/\((19\d{2}|20\d{2})[^)]*\)/g, '')
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(
+        /\b(1080p|720p|480p|576p|2160p|4K|WEB-?DL|BluRay|HD|HDRip|DVDRip|Dual\s*Audio|Multi\s*Audio|Hindi\s*Dubbed|UNCUT|REM|HEVC|x265|x264|AAC|ESub|DDR|AMZN|DSNP|NF)\b/gi,
+        ''
+      )
+      .replace(/[._]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return { cleanName, year, isSeries };
+  }
+
+  const OMDB_API_KEYS = ['trilogy', 'b7da8d63', 'd63a8a37', 'a8c17b8f'];
+  let preloadedMetaCache = null;
+
+  async function getPreloadedMetaCache() {
+    if (preloadedMetaCache) return preloadedMetaCache;
+    try {
+      const res = await fetch('./metadata_cache.json?v=' + Date.now());
+      if (res.ok) {
+        preloadedMetaCache = await res.json();
+        return preloadedMetaCache;
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  async function fetchOnlineMetadata(rawTitle, fallbackCategory = '') {
+    const { cleanName, year, isSeries } = parseCleanMediaInfo(rawTitle);
+    if (!cleanName) return null;
+
+    // 1. Check preloaded static dictionary (0ms instantaneous lookup)
+    const preloaded = await getPreloadedMetaCache();
+    if (preloaded && preloaded[cleanName.toLowerCase()]) {
+      return preloaded[cleanName.toLowerCase()];
+    }
+
+    const cacheKey = `movielist_meta_${cleanName.toLowerCase()}_${year || ''}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed._cachedAt < 1000 * 60 * 60 * 24 * 14) {
+          return parsed.data;
+        }
+      }
+    } catch (e) {}
+
+    let meta = null;
+
+    // 2. Try OMDb API with rotating failover keys
+    for (const key of OMDB_API_KEYS) {
+      try {
+        const url = `https://www.omdbapi.com/?t=${encodeURIComponent(cleanName)}${year ? '&y=' + year : ''}&plot=full&apikey=${key}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.Response === 'True') {
+            const ratings = data.Ratings || [];
+            const imdbObj = ratings.find((r) => r.Source && (r.Source.includes('Internet Movie') || r.Source.includes('IMDb')));
+
+            meta = {
+              title: data.Title,
+              year: data.Year,
+              releaseDate: data.Released && data.Released !== 'N/A' ? data.Released : null,
+              runtime: data.Runtime && data.Runtime !== 'N/A' ? data.Runtime : null,
+              rated: data.Rated && data.Rated !== 'N/A' ? data.Rated : null,
+              genres: data.Genre && data.Genre !== 'N/A' ? data.Genre.split(',').map((g) => g.trim()) : [],
+              director: data.Director && data.Director !== 'N/A' ? data.Director : null,
+              writer: data.Writer && data.Writer !== 'N/A' ? data.Writer : null,
+              actors: data.Actors && data.Actors !== 'N/A' ? data.Actors.split(',').map((a) => a.trim()) : [],
+              synopsis: data.Plot && data.Plot !== 'N/A' ? data.Plot : null,
+              awards: data.Awards && data.Awards !== 'N/A' ? data.Awards : null,
+              boxOffice: data.BoxOffice && data.BoxOffice !== 'N/A' ? data.BoxOffice : null,
+              country: data.Country && data.Country !== 'N/A' ? data.Country : null,
+              language: data.Language && data.Language !== 'N/A' ? data.Language : null,
+              imdbRating:
+                data.imdbRating && data.imdbRating !== 'N/A'
+                  ? data.imdbRating
+                  : imdbObj
+                    ? imdbObj.Value.split('/')[0]
+                    : null,
+              poster: data.Poster && data.Poster !== 'N/A' ? data.Poster : null
+            };
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback to TVMaze if TV Series
+    if (
+      !meta &&
+      (isSeries ||
+        fallbackCategory.includes('TV') ||
+        fallbackCategory.includes('Drama') ||
+        fallbackCategory.includes('Series'))
+    ) {
+      try {
+        const res = await fetch(
+          `https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(cleanName)}&embed=cast`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const summary = (data.summary || '').replace(/<[^>]*>/g, '').trim();
+          const embeddedCast =
+            data._embedded && Array.isArray(data._embedded.cast)
+              ? data._embedded.cast
+                  .slice(0, 10)
+                  .map((c) => ({
+                    name: c.person ? c.person.name : '',
+                    character: c.character ? c.character.name : 'Cast',
+                    image: c.person && c.person.image ? c.person.image.medium || c.person.image.original : null
+                  }))
+                  .filter((c) => c.name)
+              : [];
+
+          meta = {
+            title: data.name,
+            year: data.premiered ? data.premiered.slice(0, 4) : year,
+            releaseDate: data.premiered || null,
+            imdbRating: data.rating && data.rating.average ? data.rating.average.toString() : null,
+            runtime: data.averageRuntime ? `${data.averageRuntime} min` : null,
+            genres: data.genres || [],
+            actors: embeddedCast,
+            synopsis: summary,
+            poster: data.image ? data.image.original || data.image.medium : null,
+            backdrop: data.image ? data.image.original : null
+          };
+        }
+      } catch (e) {}
+    }
+
+    // 4. Fallback to Wikipedia REST API
+    if (!meta) {
+      try {
+        const wikiRes = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanName.replace(/\s+/g, '_'))}`
+        );
+        if (wikiRes.ok) {
+          const wiki = await wikiRes.json();
+          if (wiki.extract && !wiki.title.toLowerCase().includes('disambiguation')) {
+            meta = {
+              title: wiki.title,
+              year: year,
+              synopsis: wiki.extract,
+              backdrop: wiki.originalimage ? wiki.originalimage.source : wiki.thumbnail ? wiki.thumbnail.source : null
+            };
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (meta) {
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ _cachedAt: Date.now(), data: meta }));
+      } catch (e) {}
+    }
+
+    return meta;
+  }
+
+  async function getActorPortraitPhoto(actorName) {
+    if (!actorName) return null;
+    const cacheKey = `movielist_actor_${actorName.toLowerCase().replace(/\s+/g, '_')}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return cached;
+    } catch (e) {}
+    try {
+      const res = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(actorName.replace(/\s+/g, '_'))}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.thumbnail && data.thumbnail.source) {
+          try {
+            localStorage.setItem(cacheKey, data.thumbnail.source);
+          } catch (e) {}
+          return data.thumbnail.source;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  async function loadAndApplyOnlineMetadata(movie) {
+    if (!movie || !movie.title) return;
+    const currentId = movie.id;
+    try {
+      const meta = await fetchOnlineMetadata(movie.rawTitle || movie.title, movie.category || '');
+      if (!meta || !state.activeMovie || state.activeMovie.id !== currentId) return;
+
+      // 1. Plot Synopsis Description
+      if (meta.synopsis) {
+        const synEl = document.getElementById('detailsSynopsisText');
+        const moreBtn = document.getElementById('btnSynopsisMore');
+        if (synEl) {
+          synEl.textContent = meta.synopsis;
+          if (moreBtn) {
+            moreBtn.style.display = meta.synopsis.length > 160 ? 'inline-flex' : 'none';
+          }
+        }
+      }
+
+      // 2. IMDb Rating
+      if (meta.imdbRating && meta.imdbRating !== 'N/A') {
+        const ratingTag = document.getElementById('modalRatingTag');
+        if (ratingTag) {
+          ratingTag.textContent = `${meta.imdbRating} Rating`;
+        }
+      }
+
+      // 3. Technical Specs
+      if (meta.releaseDate) {
+        const relVal = document.getElementById('techReleaseVal');
+        if (relVal) relVal.textContent = meta.releaseDate;
+      }
+
+      if (meta.director) {
+        const dirVal = document.getElementById('techDirectorVal');
+        if (dirVal) dirVal.textContent = meta.director;
+        const dirHeadline = document.getElementById('detailsDirectorHeadline');
+        if (dirHeadline) dirHeadline.textContent = `Directed by ${meta.director}`;
+      }
+
+      if (meta.writer) {
+        const wItem = document.getElementById('techWriterItem');
+        const wVal = document.getElementById('techWriterVal');
+        if (wItem && wVal) {
+          wVal.textContent = meta.writer;
+          wItem.style.display = 'flex';
+        }
+      }
+
+      if (meta.boxOffice) {
+        const bItem = document.getElementById('techBoxOfficeItem');
+        const bVal = document.getElementById('techBoxOfficeVal');
+        if (bItem && bVal) {
+          bVal.textContent = `${meta.boxOffice} (Worldwide)`;
+          bItem.style.display = 'flex';
+        }
+      }
+
+      if (meta.country || meta.language) {
+        const cItem = document.getElementById('techCountryItem');
+        const cVal = document.getElementById('techCountryVal');
+        if (cItem && cVal) {
+          cVal.textContent = [meta.country, meta.language].filter(Boolean).join(' • ');
+          cItem.style.display = 'flex';
+        }
+      }
+
+      if (meta.awards) {
+        const aItem = document.getElementById('techAwardsItem');
+        const aVal = document.getElementById('techAwardsVal');
+        if (aItem && aVal) {
+          aVal.textContent = meta.awards;
+          aItem.style.display = 'flex';
+        }
+      }
+
+      // 4. Top Cast & Characters Section
+      let rawActors = meta.actors;
+      let actorsList = [];
+      if (Array.isArray(rawActors)) {
+        actorsList = rawActors.map((a) => (typeof a === 'string' ? { name: a, character: 'Cast', image: null } : a));
+      } else if (typeof rawActors === 'string') {
+        actorsList = rawActors
+          .split(',')
+          .map((a) => ({ name: a.trim(), character: 'Cast', image: null }))
+          .filter((a) => a.name);
+      }
+
+      if (actorsList.length > 0) {
+        const castSection = document.getElementById('detailsCastSection');
+        const castGrid = document.getElementById('detailsCastGrid');
+
+        if (castSection && castGrid) {
+          castGrid.innerHTML = actorsList
+            .map((actor, idx) => {
+              const initials = actor.name
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase();
+              const roleLabel = actor.character && actor.character !== 'Cast' ? actor.character : 'Cast Member';
+
+              return `
+                <a class="cast-card" href="https://www.google.com/search?q=${encodeURIComponent(actor.name + ' actor')}" target="_blank" rel="noopener" title="Search ${escapeQuotes(actor.name)}">
+                  <div class="cast-avatar" id="castAvatar-${idx}">
+                    ${actor.image ? `<img src="${sanitizeUrl(actor.image)}" alt="${escapeQuotes(actor.name)}" />` : initials}
+                  </div>
+                  <div class="cast-info">
+                    <span class="cast-name">${escapeHtml(actor.name)}</span>
+                    <span class="cast-role">${escapeHtml(roleLabel)}</span>
+                  </div>
+                </a>
+              `;
+            })
+            .join('');
+
+          castSection.style.display = 'block';
+
+          // Asynchronously hydrate actor photos from Wikipedia if missing
+          actorsList.forEach((actor, idx) => {
+            if (!actor.image) {
+              getActorPortraitPhoto(actor.name)
+                .then((photoUrl) => {
+                  if (photoUrl && state.activeMovie && state.activeMovie.id === currentId) {
+                    const avatarEl = document.getElementById(`castAvatar-${idx}`);
+                    if (avatarEl) {
+                      avatarEl.innerHTML = `<img src="${sanitizeUrl(photoUrl)}" alt="${escapeQuotes(actor.name)}" />`;
+                    }
+                  }
+                })
+                .catch(() => {});
+            }
+          });
+        }
+      }
+
+      // 5. Cinematic Backdrop upgrade if available
+      if (meta.backdrop) {
+        const bgImg = document.getElementById('modalBackdropImg');
+        if (bgImg) {
+          bgImg.src = sanitizeUrl(meta.backdrop);
+        }
+      }
+    } catch (e) {
+      console.warn('Metadata hydration:', e);
     }
   }
 
@@ -2676,6 +3083,7 @@
     closeDetails,
     shareMedia,
     toggleWatchlistFromPage,
+    toggleSynopsis,
     openTrailer,
     closeTrailer,
     playMovie,

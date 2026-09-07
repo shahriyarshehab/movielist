@@ -1,4 +1,4 @@
-const CACHE_NAME = 'movielist-v7';
+const CACHE_NAME = 'movielist-v8';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './home_data.json',
+  './metadata_cache.json',
   './manifest.json'
 ];
 

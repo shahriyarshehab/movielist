@@ -265,12 +265,22 @@
                 </div>
               </div>
 
+              <!-- Media Plot Synopsis / Description -->
+              <div class="details-synopsis-box" id="detailsSynopsisBox">
+                <p class="details-synopsis-text" id="detailsSynopsisText">Stream and download high-speed 1080p HD media with zero buffering on BDIX networks.</p>
+                <button class="btn-synopsis-more" id="btnSynopsisMore" onclick="window.MovieList.toggleSynopsis()" style="display: none;">More</button>
+              </div>
+
               <!-- Primary Action Buttons -->
               <div class="details-actions-row">
                 <button class="btn-solid-primary btn-hero-play" id="modalPlayBtn">
                   <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i>
                   <span id="modalPlayBtnText">Play Movie</span>
                 </button>
+                <a class="btn-glass btn-hero-action btn-hero-download" id="modalDownloadBtn" href="#" download target="_blank" rel="noopener" title="Direct Download Media">
+                  <i data-lucide="download" style="width:18px;height:18px;"></i>
+                  <span id="modalDownloadBtnText">Download</span>
+                </a>
                 <button class="btn-glass btn-hero-action" id="modalTrailerBtn">
                   <i data-lucide="film" style="width:18px;height:18px;"></i>
                   <span>Watch Trailer</span>
@@ -361,6 +371,67 @@
 
             <!-- Episode Cards Grid -->
             <div class="episode-list-container" id="episodeListContainer"></div>
+          </div>
+        </div>
+
+        <!-- Top Cast & Characters Section -->
+        <div class="details-panel-card cast-panel-card" id="detailsCastSection" style="display: none;">
+          <div class="details-panel-header">
+            <div class="panel-header-title">
+              <i data-lucide="users" style="width:18px;height:18px;color:var(--primary);"></i>
+              <span>Top Cast &amp; Characters</span>
+            </div>
+            <span class="panel-header-sub" id="detailsDirectorHeadline">Leading performers</span>
+          </div>
+          <div class="cast-grid" id="detailsCastGrid"></div>
+        </div>
+
+        <!-- Media Overview & Technical Credits Section -->
+        <div class="details-panel-card tech-panel-card" id="detailsTechSection">
+          <div class="details-panel-header">
+            <div class="panel-header-title">
+              <i data-lucide="info" style="width:18px;height:18px;color:var(--primary);"></i>
+              <span>Media Overview &amp; Credits</span>
+            </div>
+            <span class="panel-header-sub">Production metadata, awards, and specifications</span>
+          </div>
+          <div class="tech-info-grid" id="detailsTechGrid">
+            <div class="tech-info-item" id="techReleaseItem">
+              <span class="tech-info-label">Release Date</span>
+              <span class="tech-info-val" id="techReleaseVal">—</span>
+            </div>
+            <div class="tech-info-item" id="techDirectorItem">
+              <span class="tech-info-label">Director</span>
+              <span class="tech-info-val" id="techDirectorVal">—</span>
+            </div>
+            <div class="tech-info-item" id="techWriterItem" style="display: none;">
+              <span class="tech-info-label">Writer / Screenplay</span>
+              <span class="tech-info-val" id="techWriterVal">—</span>
+            </div>
+            <div class="tech-info-item" id="techBoxOfficeItem" style="display: none;">
+              <span class="tech-info-label">Box Office</span>
+              <span class="tech-info-val" id="techBoxOfficeVal" style="color: #22c55e;">—</span>
+            </div>
+            <div class="tech-info-item" id="techCountryItem" style="display: none;">
+              <span class="tech-info-label">Country &amp; Language</span>
+              <span class="tech-info-val" id="techCountryVal">—</span>
+            </div>
+            <div class="tech-info-item" id="techAwardsItem" style="display: none;">
+              <span class="tech-info-label">Awards &amp; Accolades</span>
+              <span class="tech-info-val" id="techAwardsVal" style="color: #ffb800;">—</span>
+            </div>
+            <div class="tech-info-item">
+              <span class="tech-info-label">Video Quality</span>
+              <span class="tech-info-val" id="techQualityVal">1080p Full HD</span>
+            </div>
+            <div class="tech-info-item">
+              <span class="tech-info-label">Audio &amp; Tracks</span>
+              <span class="tech-info-val" id="techAudioVal">Dual Audio / Original</span>
+            </div>
+            <div class="tech-info-item">
+              <span class="tech-info-label">File Size</span>
+              <span class="tech-info-val" id="techSizeVal">HD Stream</span>
+            </div>
           </div>
         </div>
       </div>
